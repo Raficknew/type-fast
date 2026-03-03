@@ -1,17 +1,20 @@
 "use client";
 
+import { supabase } from "@/lib/db";
 import { getRandomSentence } from "@/lib/pure";
 import { useEffect, useRef, useState } from "react";
 
 export function TypeTest({
   sentence,
-  endGame,
+  round,
+  raceId,
 }: {
   sentence: string;
-  endGame: () => void;
+  round: number;
+  raceId: string;
 }) {
   const [currentSentence, setCurrentSentence] = useState<string>(sentence);
-  const roundTime = 10; // seconds
+  const roundTime = 60; // seconds
   const wordsInSentence = currentSentence.split(" ");
   const charCounter = currentSentence.length;
 
@@ -22,8 +25,29 @@ export function TypeTest({
   const [mistakes, setMistakes] = useState<number>(0);
 
   const [hasRoundEnded, setHasRoundEnded] = useState<boolean>(false);
-  const [roundKey, setRoundKey] = useState<number>(0);
+  const [roundKey, setRoundKey] = useState<number>(round);
   const WPM = useRef(0);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("public:race")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "race",
+        },
+        (payload) => {
+          setCurrentSentence(payload.new.sentence);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -48,7 +72,14 @@ export function TypeTest({
     }
   }, [hasRoundEnded, correctWordsCount, counter]);
 
-  const restartGame = () => {
+  const restartGame = async () => {
+    const newSentence = getRandomSentence();
+
+    await supabase
+      .from("race")
+      .update({ sentence: newSentence })
+      .eq("id", raceId);
+
     setCurrentText("");
     setCurrentWordIndex(0);
     setCorrectWordsCount(0);
@@ -56,7 +87,6 @@ export function TypeTest({
     setMistakes(0);
     setHasRoundEnded(false);
     WPM.current = 0;
-    const newSentence = getRandomSentence();
     setCurrentSentence(newSentence);
     setRoundKey((prev) => prev + 1);
   };
@@ -64,9 +94,9 @@ export function TypeTest({
   useEffect(() => {
     if (hasRoundEnded) {
       if (roundKey === 3) {
-        endGame();
+        alert("Game Over! Thanks for playing.");
       } else {
-        restartGame();
+        void restartGame();
       }
     }
   }, [hasRoundEnded]);
