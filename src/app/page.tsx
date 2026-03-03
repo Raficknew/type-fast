@@ -1,6 +1,6 @@
 "use client";
 import { TypeTest } from "@/components/TypeTest";
-import { sentences } from "@/lib/sentences";
+import { getRandomSentence } from "@/lib/pure";
 import { useState } from "react";
 
 export default function TypeFastGamePage() {
@@ -9,9 +9,13 @@ export default function TypeFastGamePage() {
 
   const startGame = () => {
     setHasGameStarted(true);
-    const randomSentence =
-      sentences[Math.floor(Math.random() * sentences.length)];
+    const randomSentence = getRandomSentence();
     setSentence(randomSentence);
+  };
+
+  const endGame = () => {
+    setHasGameStarted(false);
+    setSentence("");
   };
 
   if (!hasGameStarted && !sentence) {
@@ -26,5 +30,5 @@ export default function TypeFastGamePage() {
     );
   }
 
-  return <TypeTest sentence={sentence} />;
+  return <TypeTest sentence={sentence} endGame={() => endGame()} />;
 }

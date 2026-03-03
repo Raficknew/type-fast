@@ -1,11 +1,17 @@
 "use client";
 
-import { sentences } from "@/lib/sentences";
+import { getRandomSentence } from "@/lib/pure";
 import { useEffect, useRef, useState } from "react";
 
-export function TypeTest({ sentence }: { sentence: string }) {
+export function TypeTest({
+  sentence,
+  endGame,
+}: {
+  sentence: string;
+  endGame: () => void;
+}) {
   const [currentSentence, setCurrentSentence] = useState<string>(sentence);
-  const roundTime = 60; // seconds
+  const roundTime = 10; // seconds
   const wordsInSentence = currentSentence.split(" ");
   const charCounter = currentSentence.length;
 
@@ -16,6 +22,7 @@ export function TypeTest({ sentence }: { sentence: string }) {
   const [mistakes, setMistakes] = useState<number>(0);
 
   const [hasRoundEnded, setHasRoundEnded] = useState<boolean>(false);
+  const [roundKey, setRoundKey] = useState<number>(0);
   const WPM = useRef(0);
 
   useEffect(() => {
@@ -31,7 +38,7 @@ export function TypeTest({ sentence }: { sentence: string }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [roundKey]);
 
   useEffect(() => {
     if (!hasRoundEnded && correctWordsCount > 0) {
@@ -41,9 +48,32 @@ export function TypeTest({ sentence }: { sentence: string }) {
     }
   }, [hasRoundEnded, correctWordsCount, counter]);
 
+  const restartGame = () => {
+    setCurrentText("");
+    setCurrentWordIndex(0);
+    setCorrectWordsCount(0);
+    setCounter(roundTime);
+    setMistakes(0);
+    setHasRoundEnded(false);
+    WPM.current = 0;
+    const newSentence = getRandomSentence();
+    setCurrentSentence(newSentence);
+    setRoundKey((prev) => prev + 1);
+  };
+
+  useEffect(() => {
+    if (hasRoundEnded) {
+      if (roundKey === 3) {
+        endGame();
+      } else {
+        restartGame();
+      }
+    }
+  }, [hasRoundEnded]);
+
   const handleWordCheck = (text: string) => {
     const isCorrect = text.trim() === wordsInSentence[currentWordIndex];
-    const isLastWord = currentWordIndex === charCounter - 1;
+    const isLastWord = currentWordIndex === wordsInSentence.length - 1;
 
     if (isCorrect) {
       setCorrectWordsCount((prev) => prev + 1);
@@ -58,11 +88,12 @@ export function TypeTest({ sentence }: { sentence: string }) {
   };
 
   const handleInputChange = (text: string) => {
+    const isDeleting = text.length < currentText.length;
     setCurrentText(text);
 
     if (text.endsWith(" ")) {
       handleWordCheck(text);
-    } else {
+    } else if (!isDeleting) {
       for (let i = 0; i < text.length; i++) {
         if (text[i] !== wordsInSentence[currentWordIndex][i]) {
           setMistakes((prev) => prev + 1);
