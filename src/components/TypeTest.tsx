@@ -14,7 +14,7 @@ export function TypeTest({
   raceId: string;
 }) {
   const [currentSentence, setCurrentSentence] = useState<string>(sentence);
-  const roundTime = 30; // seconds
+  const roundTime = 60; // seconds
   const wordsInSentence = currentSentence.split(" ");
   const charCounter = currentSentence.length;
 
