@@ -14,7 +14,7 @@ export function TypeTest({
   raceId: string;
 }) {
   const [currentSentence, setCurrentSentence] = useState<string>(sentence);
-  const roundTime = 60; // seconds
+  const roundTime = 30; // seconds
   const wordsInSentence = currentSentence.split(" ");
   const charCounter = currentSentence.length;
 
@@ -25,6 +25,7 @@ export function TypeTest({
   const [mistakes, setMistakes] = useState<number>(0);
 
   const [hasRoundEnded, setHasRoundEnded] = useState<boolean>(false);
+  const [userHasFinished, setUserHasFinished] = useState<boolean>(false);
   const [roundKey, setRoundKey] = useState<number>(round);
   const WPM = useRef(0);
 
@@ -65,12 +66,12 @@ export function TypeTest({
   }, [roundKey]);
 
   useEffect(() => {
-    if (!hasRoundEnded && correctWordsCount > 0) {
+    if (!hasRoundEnded && !userHasFinished && correctWordsCount > 0) {
       WPM.current = Math.round(
         (correctWordsCount / (roundTime - counter)) * 60,
       );
     }
-  }, [hasRoundEnded, correctWordsCount, counter]);
+  }, [hasRoundEnded, userHasFinished, correctWordsCount, counter]);
 
   const restartGame = async () => {
     const newSentence = getRandomSentence();
@@ -86,6 +87,7 @@ export function TypeTest({
     setCounter(roundTime);
     setMistakes(0);
     setHasRoundEnded(false);
+    setUserHasFinished(false);
     WPM.current = 0;
     setCurrentSentence(newSentence);
     setRoundKey((prev) => prev + 1);
@@ -93,11 +95,7 @@ export function TypeTest({
 
   useEffect(() => {
     if (hasRoundEnded) {
-      if (roundKey === 3) {
-        alert("Game Over! Thanks for playing.");
-      } else {
-        void restartGame();
-      }
+      restartGame();
     }
   }, [hasRoundEnded]);
 
@@ -110,7 +108,7 @@ export function TypeTest({
       setCurrentWordIndex((prev) => prev + 1);
       setCurrentText("");
       if (isLastWord) {
-        setHasRoundEnded(true);
+        setUserHasFinished(true);
       }
     } else {
       setMistakes((prev) => prev + 1);
@@ -149,12 +147,22 @@ export function TypeTest({
         className="border rounded-sm p-1 w-full"
         value={currentText}
         onChange={(e) => handleInputChange(e.target.value)}
-        disabled={hasRoundEnded}
+        disabled={hasRoundEnded || userHasFinished}
       />
-      <div>
-        <h3>WPM: {WPM.current}</h3>
-        <h3>Accuracy: {calculateAccuracy()}%</h3>
-      </div>
+      <table className="text-center">
+        <thead>
+          <tr>
+            <th>WPM</th>
+            <th>Accuracy</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{WPM.current}</td>
+            <td>{calculateAccuracy()}%</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
