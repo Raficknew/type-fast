@@ -1,0 +1,168 @@
+"use client";
+
+import { supabase } from "@/lib/db";
+import { getRandomSentence } from "@/lib/pure";
+import { useEffect, useRef, useState } from "react";
+
+export function TypeTest({
+  sentence,
+  round,
+  raceId,
+}: {
+  sentence: string;
+  round: number;
+  raceId: string;
+}) {
+  const [currentSentence, setCurrentSentence] = useState<string>(sentence);
+  const roundTime = 30; // seconds
+  const wordsInSentence = currentSentence.split(" ");
+  const charCounter = currentSentence.length;
+
+  const [currentText, setCurrentText] = useState<string>("");
+  const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
+  const [correctWordsCount, setCorrectWordsCount] = useState<number>(0);
+  const [counter, setCounter] = useState<number>(roundTime);
+  const [mistakes, setMistakes] = useState<number>(0);
+
+  const [hasRoundEnded, setHasRoundEnded] = useState<boolean>(false);
+  const [userHasFinished, setUserHasFinished] = useState<boolean>(false);
+  const [roundKey, setRoundKey] = useState<number>(round);
+  const WPM = useRef(0);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("public:race")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "race",
+        },
+        (payload) => {
+          setCurrentSentence(payload.new.sentence);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCounter((prevCounter) => {
+        if (prevCounter <= 1) {
+          clearInterval(timer);
+          setHasRoundEnded(true);
+          return 0;
+        }
+        return prevCounter - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [roundKey]);
+
+  useEffect(() => {
+    if (!hasRoundEnded && !userHasFinished && correctWordsCount > 0) {
+      WPM.current = Math.round(
+        (correctWordsCount / (roundTime - counter)) * 60,
+      );
+    }
+  }, [hasRoundEnded, userHasFinished, correctWordsCount, counter]);
+
+  const restartGame = async () => {
+    const newSentence = getRandomSentence();
+
+    await supabase
+      .from("race")
+      .update({ sentence: newSentence })
+      .eq("id", raceId);
+
+    setCurrentText("");
+    setCurrentWordIndex(0);
+    setCorrectWordsCount(0);
+    setCounter(roundTime);
+    setMistakes(0);
+    setHasRoundEnded(false);
+    setUserHasFinished(false);
+    WPM.current = 0;
+    setCurrentSentence(newSentence);
+    setRoundKey((prev) => prev + 1);
+  };
+
+  useEffect(() => {
+    if (hasRoundEnded) {
+      restartGame();
+    }
+  }, [hasRoundEnded]);
+
+  const handleWordCheck = (text: string) => {
+    const isCorrect = text.trim() === wordsInSentence[currentWordIndex];
+    const isLastWord = currentWordIndex === wordsInSentence.length - 1;
+
+    if (isCorrect) {
+      setCorrectWordsCount((prev) => prev + 1);
+      setCurrentWordIndex((prev) => prev + 1);
+      setCurrentText("");
+      if (isLastWord) {
+        setUserHasFinished(true);
+      }
+    } else {
+      setMistakes((prev) => prev + 1);
+    }
+  };
+
+  const handleInputChange = (text: string) => {
+    const isDeleting = text.length < currentText.length;
+    setCurrentText(text);
+
+    if (text.endsWith(" ")) {
+      handleWordCheck(text);
+    } else if (!isDeleting) {
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] !== wordsInSentence[currentWordIndex][i]) {
+          setMistakes((prev) => prev + 1);
+          break;
+        }
+      }
+    }
+  };
+
+  const calculateAccuracy = () => {
+    if (charCounter === 0) return 100;
+    return Math.round(((charCounter - mistakes) / charCounter) * 100);
+  };
+
+  return (
+    <div className="flex flex-col gap-2 p-4 max-w-125">
+      <div className="text-center text-2xl">Next Round in: {counter}</div>
+      <div className="text-xl mb-4 bg-gray-100 p-2 rounded-sm">
+        {currentSentence}
+      </div>
+      <input
+        type="text"
+        className="border rounded-sm p-1 w-full"
+        value={currentText}
+        onChange={(e) => handleInputChange(e.target.value)}
+        disabled={hasRoundEnded || userHasFinished}
+      />
+      <table className="text-center">
+        <thead>
+          <tr>
+            <th>WPM</th>
+            <th>Accuracy</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{WPM.current}</td>
+            <td>{calculateAccuracy()}%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
