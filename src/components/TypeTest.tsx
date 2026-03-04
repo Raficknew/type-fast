@@ -99,21 +99,15 @@ export function TypeTest({
   }, []);
 
   useEffect(() => {
-    if (game.round >= MAX_ROUNDS) {
-      router.push("/");
-      return;
-    }
-
     const timer = setInterval(() => {
-      setGame((prev) => {
-        const elapsed = (performance.now() - roundStartedAt.current) / 1000;
-        const timeLeft = Math.round(ROUND_TIME - elapsed);
-        if (timeLeft <= 0) {
-          clearInterval(timer);
-          return { ...prev, counter: 0, hasRoundEnded: true };
-        }
-        return { ...prev, counter: timeLeft };
-      });
+      const elapsed = (performance.now() - roundStartedAt.current) / 1000;
+      const timeLeft = Math.round(ROUND_TIME - elapsed);
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        setGame((prev) => ({ ...prev, counter: 0, hasRoundEnded: true }));
+      } else {
+        setGame((prev) => ({ ...prev, counter: timeLeft }));
+      }
     }, 1000);
 
     return () => clearInterval(timer);
@@ -138,12 +132,10 @@ export function TypeTest({
 
   useEffect(() => {
     if (game.hasRoundEnded) {
-      if (game.round >= MAX_ROUNDS) {
+      if (game.round + 1 >= MAX_ROUNDS) {
         deleteRace(raceId).catch(console.error);
       } else {
         restartRace(raceId, game.round).catch(() => {
-          // If the server action fails, reset hasRoundEnded so the
-          // effect can re-trigger on the next render cycle.
           setGame((prev) => ({ ...prev, hasRoundEnded: false }));
         });
       }
@@ -191,8 +183,8 @@ export function TypeTest({
   return (
     <div className="flex flex-col gap-2 p-4 max-w-125">
       <div>Round: {game.round}</div>
-      <div className="text-center text-2xl">Next Round in: {game.counter}</div>
-      <div className="text-xl mb-4 bg-gray-100 p-2 rounded-sm">
+      <div className="text-center text-2xl">Next Round in {game.counter}s</div>
+      <div className="text-xl mb-4 bg-gray-100 p-2 rounded-sm select-none">
         {game.sentence}
       </div>
       <input

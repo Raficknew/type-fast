@@ -21,7 +21,7 @@ export const createRace = async () => {
 
   const { error } = await supabase.from("race").insert({
     sentence: randomSentence,
-    round: 0,
+    round: 1,
     end_time: newRoundEndTime,
   });
 
@@ -33,7 +33,6 @@ export const createRace = async () => {
 };
 
 export const deleteRace = async (raceId: string) => {
-  // Only delete if the race has actually reached MAX_ROUNDS.
   const { data, error: fetchError } = await supabase
     .from("race")
     .select("round")
@@ -41,10 +40,10 @@ export const deleteRace = async (raceId: string) => {
     .single();
 
   if (fetchError || !data) {
-    throw new Error("Race not found");
+    revalidatePath("/");
   }
 
-  if (data.round < MAX_ROUNDS) {
+  if (data.round < MAX_ROUNDS - 1) {
     throw new Error("Race has not ended yet");
   }
 
