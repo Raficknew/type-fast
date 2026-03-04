@@ -1,3 +1,5 @@
+import { createRace } from "@/actions/actions";
+import { StartGameButton } from "@/components/StartGameButton";
 import { TypeTest } from "@/components/TypeTest";
 import { supabase } from "@/lib/db";
 
@@ -10,14 +12,15 @@ export default async function TypeFastGamePage() {
   }
 
   if (!hasGameStarted || !data || data.length === 0) {
-    return <div>You have to manually insert the race to the database</div>;
+    return <StartGameButton createRace={createRace} />;
   }
 
   return (
     <TypeTest
-      sentence={data[0]?.sentence || ""}
-      round={0}
-      raceId={data[0]?.id}
+      sentence={data[0].sentence}
+      round={data[0].round}
+      raceId={data[0].id}
+      endTime={data[0].end_time}
     />
   );
 }
