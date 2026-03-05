@@ -53,6 +53,8 @@ export const deleteRace = async (raceId: string) => {
     throw new Error("Failed to delete race");
   }
 
+  await supabase.from("player-stats").delete().neq("id", 0);
+
   revalidatePath("/");
 };
 

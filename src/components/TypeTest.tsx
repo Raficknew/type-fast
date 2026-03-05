@@ -4,9 +4,18 @@ import { deleteRace, restartRace } from "@/actions/actions";
 import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
 import { supabase } from "@/lib/db";
 import { getTimeLeft } from "@/lib/pure";
+import { PlayerStatsTable } from "@/components/PlayerStatsTable";
+import type { User } from "@supabase/supabase-js";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+
+function getDisplayName(user: User): string {
+  return (
+    user.user_metadata?.display_name ??
+    `Player #${user.id.slice(0, 6).toUpperCase()}`
+  );
+}
 
 type GameState = {
   sentence: string;
@@ -19,6 +28,7 @@ type GameState = {
   mistakes: number;
   hasRoundEnded: boolean;
   userHasFinished: boolean;
+  wpm: number;
 };
 
 export function TypeTest({
@@ -43,11 +53,78 @@ export function TypeTest({
     mistakes: 0,
     hasRoundEnded: false,
     userHasFinished: false,
+    wpm: 0,
   });
   const roundStartedAt = useRef<number>(0);
+  const userRef = useRef<User | null>(null);
+  const insertedRef = useRef(false);
+  const gameRef = useRef(game);
   const router = useRouter();
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <we want this to run only once on mount>
+  // Keep gameRef in sync so the interval always reads fresh values without restarting
+  useEffect(() => {
+    gameRef.current = game;
+  });
+
+  useEffect(() => {
+    const ensurePlayerRow = async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData.user;
+      if (!user) return;
+      userRef.current = user;
+
+      if (insertedRef.current) return;
+      insertedRef.current = true;
+
+      const { data: existing } = await supabase
+        .from("player-stats")
+        .select("name, wpm")
+        .eq("name", getDisplayName(user))
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from("player-stats").insert({
+          name: getDisplayName(user),
+        });
+      } else if (existing.wpm) {
+        setGame((prev) => ({ ...prev, wpm: existing.wpm }));
+      }
+    };
+
+    ensurePlayerRow();
+  }, [raceId]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const game = gameRef.current;
+      if (game.userHasFinished || game.hasRoundEnded) return;
+
+      const user = userRef.current;
+      if (!user) return;
+
+      const words = game.sentence.split(" ");
+      const sentenceLength = game.sentence.length;
+      const accuracy =
+        sentenceLength > 0
+          ? Math.round(
+              ((sentenceLength - game.mistakes) / sentenceLength) * 100,
+            )
+          : 100;
+
+      await supabase
+        .from("player-stats")
+        .update({
+          wpm: game.wpm,
+          accuracy,
+          live_progress: words[game.currentWordIndex] ?? "|",
+        })
+        .eq("name", getDisplayName(user));
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const elapsed = (ROUND_TIME - getTimeLeft(endTime)) * 1000;
     roundStartedAt.current = performance.now() - elapsed;
@@ -56,7 +133,6 @@ export function TypeTest({
 
   const wordsInSentence = game.sentence.split(" ");
   const charCounter = game.sentence.length;
-  const WPM = useRef(0);
 
   useEffect(() => {
     const channel = supabase
@@ -75,7 +151,6 @@ export function TypeTest({
 
           if (payload.eventType === "UPDATE") {
             roundStartedAt.current = performance.now();
-            WPM.current = 0;
             setGame((prev) => ({
               ...prev,
               sentence: payload.new.sentence,
@@ -87,6 +162,7 @@ export function TypeTest({
               mistakes: 0,
               hasRoundEnded: false,
               userHasFinished: false,
+              wpm: 0,
             }));
           }
         },
@@ -119,9 +195,12 @@ export function TypeTest({
       !game.userHasFinished &&
       game.correctWordsCount > 0
     ) {
-      WPM.current = Math.round(
-        (game.correctWordsCount / (ROUND_TIME - game.counter)) * 60,
-      );
+      setGame((prev) => ({
+        ...prev,
+        wpm: Math.round(
+          (prev.correctWordsCount / (ROUND_TIME - prev.counter)) * 60,
+        ),
+      }));
     }
   }, [
     game.hasRoundEnded,
@@ -181,11 +260,25 @@ export function TypeTest({
   };
 
   return (
-    <div className="flex flex-col gap-2 p-4 max-w-125">
+    <div className="flex flex-col gap-2 p-4 max-w-150">
       <div>Round: {game.round}</div>
       <div className="text-center text-2xl">Next Round in {game.counter}s</div>
-      <div className="text-xl mb-4 bg-gray-100 p-2 rounded-sm select-none">
-        {game.sentence}
+      <div className="text-xl mb-4 bg-gray-100 p-2 rounded-sm select-none grow">
+        {wordsInSentence.map((word, i) => (
+          <span
+            key={`${word}#${i}`}
+            className={
+              i < game.currentWordIndex
+                ? "text-green-600"
+                : i === game.currentWordIndex
+                  ? "font-bold underline"
+                  : "text-gray-500"
+            }
+          >
+            {word}
+            {i < wordsInSentence.length - 1 ? " " : ""}
+          </span>
+        ))}
       </div>
       <input
         type="text"
@@ -194,20 +287,12 @@ export function TypeTest({
         onChange={(e) => handleInputChange(e.target.value)}
         disabled={game.hasRoundEnded || game.userHasFinished}
       />
-      <table className="text-center">
-        <thead>
-          <tr>
-            <th>WPM</th>
-            <th>Accuracy</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>{WPM.current}</td>
-            <td>{calculateAccuracy()}%</td>
-          </tr>
-        </tbody>
-      </table>
+      <PlayerStatsTable
+        name={userRef.current ? getDisplayName(userRef.current) : ""}
+        wpm={game.wpm}
+        accuracy={calculateAccuracy()}
+        live_progress={wordsInSentence[game.currentWordIndex] ?? "FINISHED"}
+      />
     </div>
   );
 }
