@@ -1,6 +1,7 @@
 "use client";
 
-import { deleteRace, restartRace } from "@/actions/actions";
+import { deleteRace, restartRace } from "@/actions/race";
+import { ensurePlayerRow, updatePlayerLiveStats } from "@/actions/playerStats";
 import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
 import { supabaseClient as supabase } from "@/lib/db";
 import { calculateAccuracy, getTimeLeft } from "@/lib/pure";
@@ -59,6 +60,7 @@ export function TypeTest({
   const userRef = useRef<User | null>(null);
   const insertedRef = useRef(false);
   const gameRef = useRef(game);
+  const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   const wordsInSentence = game.sentence.split(" ");
@@ -70,7 +72,11 @@ export function TypeTest({
   });
 
   useEffect(() => {
-    const ensurePlayerRow = async () => {
+    inputRef.current?.focus();
+  }, [game.round]);
+
+  useEffect(() => {
+    const initPlayer = async () => {
       const { data: authData } = await supabase.auth.getUser();
       const user = authData.user;
       if (!user) return;
@@ -79,32 +85,25 @@ export function TypeTest({
       if (insertedRef.current) return;
       insertedRef.current = true; // claim the slot before any async work
 
-      const { data: existing } = await supabase
-        .from("player_stats")
-        .select("name, wpm")
-        .eq("user_id", user.id)
-        .eq("race_id", raceId)
-        .maybeSingle();
+      const existingWpm = await ensurePlayerRow(
+        raceId,
+        user.id,
+        getDisplayName(user),
+      ).catch(() => {
+        insertedRef.current = false;
+        return null;
+      });
 
-      if (!existing) {
-        const { error } = await supabase.from("player_stats").insert({
-          name: getDisplayName(user),
-          race_id: raceId,
-          user_id: user.id,
-        });
-        if (error) insertedRef.current = false;
-      } else {
-        if (existing.wpm) {
-          setGame((prev) => ({ ...prev, wpm: existing.wpm }));
-        }
+      if (existingWpm) {
+        setGame((prev) => ({ ...prev, wpm: existingWpm }));
       }
     };
 
-    ensurePlayerRow();
+    initPlayer();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        ensurePlayerRow();
+        initPlayer();
       }
     });
 
@@ -129,15 +128,13 @@ export function TypeTest({
         mistakes: game.mistakes,
       });
 
-      await supabase
-        .from("player_stats")
-        .update({
-          wpm: game.wpm,
-          accuracy,
-          live_progress: words[game.currentWordIndex] ?? "|",
-        })
-        .eq("user_id", user.id)
-        .eq("race_id", raceId);
+      await updatePlayerLiveStats(
+        raceId,
+        user.id,
+        game.wpm,
+        accuracy,
+        words[game.currentWordIndex],
+      );
     }, 2000);
 
     return () => clearInterval(interval);
@@ -248,6 +245,15 @@ export function TypeTest({
         currentText: "",
         userHasFinished: isLastWord ? true : prev.userHasFinished,
       }));
+      if (isLastWord && userRef.current) {
+        updatePlayerLiveStats(
+          raceId,
+          userRef.current.id,
+          game.wpm,
+          accuracy,
+          "FINISHED",
+        ).catch(console.error);
+      }
     } else {
       setGame((prev) => ({ ...prev, mistakes: prev.mistakes + 1 }));
     }
@@ -291,6 +297,7 @@ export function TypeTest({
         ))}
       </div>
       <input
+        ref={inputRef}
         type="text"
         className="border rounded-sm p-1 w-full"
         value={game.currentText}

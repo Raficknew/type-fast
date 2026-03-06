@@ -1,4 +1,4 @@
-import { createRace } from "@/actions/actions";
+import { createRace } from "@/actions/race";
 import { PlayerName } from "@/components/PlayerName";
 import { StartGameButton } from "@/components/StartGameButton";
 import { TypeTest } from "@/components/TypeTest";
