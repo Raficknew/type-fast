@@ -1,7 +1,7 @@
 "use client";
 
-import { supabaseClient as supabase } from "@/lib/db";
 import { useEffect, useState } from "react";
+import { supabaseClient as supabase } from "@/lib/db";
 
 type PlayerStat = {
   id: number;

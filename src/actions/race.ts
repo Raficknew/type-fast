@@ -1,9 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { MAX_ROUNDS } from "@/gameSettings";
 import { supabaseServer as supabase } from "@/lib/db";
 import { getRandomSentence, getRoundEndTime } from "@/lib/pure";
-import { revalidatePath } from "next/cache";
 
 export const createRace = async () => {
   const { data: existingRaces } = await supabase

@@ -1,36 +1,16 @@
 "use client";
 
-import { deleteRace, restartRace } from "@/actions/race";
-import { ensurePlayerRow, updatePlayerLiveStats } from "@/actions/playerStats";
-import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
-import { supabaseClient as supabase } from "@/lib/db";
-import { calculateAccuracy, getTimeLeft } from "@/lib/pure";
-import { PlayerStatsTable } from "@/components/PlayerStatsTable";
 import type { User } from "@supabase/supabase-js";
-
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-
-function getDisplayName(user: User): string {
-  return (
-    user.user_metadata?.display_name ??
-    `Player #${user.id.slice(0, 6).toUpperCase()}`
-  );
-}
-
-type GameState = {
-  sentence: string;
-  round: number;
-  id: string;
-  currentText: string;
-  currentWordIndex: number;
-  correctWordsCount: number;
-  counter: number;
-  mistakes: number;
-  hasRoundEnded: boolean;
-  userHasFinished: boolean;
-  wpm: number;
-};
+import { ensurePlayerRow, updatePlayerLiveStats } from "@/actions/playerStats";
+import { deleteRace, restartRace } from "@/actions/race";
+import { PlayerStatsTable } from "@/components/PlayerStatsTable";
+import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
+import { supabaseClient as supabase } from "@/lib/db";
+import { calculateAccuracy, getTimeLeft, getUserName } from "@/lib/pure";
+import type { GameState } from "@/types/types";
+import { GameSentence } from "./GameSentence";
 
 export function TypeTest({
   sentence,
@@ -55,6 +35,7 @@ export function TypeTest({
     hasRoundEnded: false,
     userHasFinished: false,
     wpm: 0,
+    isWordWrong: false,
   });
   const roundStartedAt = useRef<number>(0);
   const userRef = useRef<User | null>(null);
@@ -71,6 +52,7 @@ export function TypeTest({
     gameRef.current = game;
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: game.round is used as a trigger to re-focus on each new round
   useEffect(() => {
     inputRef.current?.focus();
   }, [game.round]);
@@ -83,12 +65,12 @@ export function TypeTest({
       userRef.current = user;
 
       if (insertedRef.current) return;
-      insertedRef.current = true; // claim the slot before any async work
+      insertedRef.current = true;
 
       const existingWpm = await ensurePlayerRow(
         raceId,
         user.id,
-        getDisplayName(user),
+        getUserName(user),
       ).catch(() => {
         insertedRef.current = false;
         return null;
@@ -112,7 +94,6 @@ export function TypeTest({
     };
   }, [raceId]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const interval = setInterval(async () => {
       const game = gameRef.current;
@@ -138,13 +119,13 @@ export function TypeTest({
     }, 2000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [raceId]);
 
   useEffect(() => {
     const elapsed = (ROUND_TIME - getTimeLeft(endTime)) * 1000;
     roundStartedAt.current = performance.now() - elapsed;
     setGame((prev) => ({ ...prev, counter: getTimeLeft(endTime) }));
-  }, []);
+  }, [endTime]);
 
   useEffect(() => {
     const channel = supabase
@@ -175,6 +156,7 @@ export function TypeTest({
               hasRoundEnded: false,
               userHasFinished: false,
               wpm: 0,
+              isWordWrong: false,
             }));
           }
         },
@@ -184,8 +166,9 @@ export function TypeTest({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [router.refresh]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: game.round is used as a trigger to restart the timer on each new round
   useEffect(() => {
     const timer = setInterval(() => {
       const elapsed = (performance.now() - roundStartedAt.current) / 1000;
@@ -214,12 +197,7 @@ export function TypeTest({
         ),
       }));
     }
-  }, [
-    game.hasRoundEnded,
-    game.userHasFinished,
-    game.correctWordsCount,
-    game.counter,
-  ]);
+  }, [game.hasRoundEnded, game.userHasFinished, game.correctWordsCount]);
 
   useEffect(() => {
     if (game.hasRoundEnded) {
@@ -255,12 +233,24 @@ export function TypeTest({
         ).catch(console.error);
       }
     } else {
-      setGame((prev) => ({ ...prev, mistakes: prev.mistakes + 1 }));
+      setGame((prev) => ({
+        ...prev,
+        mistakes: prev.mistakes + 1,
+        isWordWrong: true,
+      }));
     }
   };
 
   const handleInputChange = (text: string) => {
     const isDeleting = text.length < game.currentText.length;
+
+    if (game.isWordWrong && !isDeleting) return;
+
+    if (isDeleting && game.isWordWrong) {
+      setGame((prev) => ({ ...prev, currentText: text, isWordWrong: false }));
+      return;
+    }
+
     setGame((prev) => ({ ...prev, currentText: text }));
 
     if (text.endsWith(" ")) {
@@ -275,37 +265,28 @@ export function TypeTest({
     }
   };
 
+  const typedSoFar =
+    game.currentWordIndex > 0
+      ? wordsInSentence.slice(0, game.currentWordIndex).join(" ") +
+        " " +
+        game.currentText
+      : game.currentText;
+
   return (
     <div className="flex flex-col gap-2 p-4 max-w-150">
       <div>Round: {game.round}</div>
       <div className="text-center text-2xl">Next Round in {game.counter}s</div>
-      <div className="text-xl mb-4 bg-gray-100 p-2 rounded-sm select-none grow">
-        {wordsInSentence.map((word, i) => (
-          <span
-            key={`${word}#${i}`}
-            className={
-              i < game.currentWordIndex
-                ? "text-green-600"
-                : i === game.currentWordIndex
-                  ? "font-bold underline"
-                  : "text-gray-500"
-            }
-          >
-            {word}
-            {i < wordsInSentence.length - 1 ? " " : ""}
-          </span>
-        ))}
-      </div>
+      <GameSentence game={game} typedSoFar={typedSoFar} />
       <input
         ref={inputRef}
         type="text"
-        className="border rounded-sm p-1 w-full"
+        className="opacity-0 absolute left-0 top-0 w-full h-full"
         value={game.currentText}
         onChange={(e) => handleInputChange(e.target.value)}
         disabled={game.hasRoundEnded || game.userHasFinished}
       />
       <PlayerStatsTable
-        name={userRef.current ? getDisplayName(userRef.current) : ""}
+        name={userRef.current ? getUserName(userRef.current) : ""}
         wpm={game.wpm}
         accuracy={accuracy}
         live_progress={wordsInSentence[game.currentWordIndex] ?? "FINISHED"}

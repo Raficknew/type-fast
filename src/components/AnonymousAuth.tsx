@@ -1,7 +1,7 @@
 "use client";
 
-import { supabaseClient as supabase } from "@/lib/db";
 import { useEffect } from "react";
+import { supabaseClient as supabase } from "@/lib/db";
 
 export function AnonymousAuth() {
   useEffect(() => {
