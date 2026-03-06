@@ -2,8 +2,8 @@
 
 import { deleteRace, restartRace } from "@/actions/actions";
 import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
-import { supabase } from "@/lib/db";
-import { getTimeLeft } from "@/lib/pure";
+import { supabaseClient as supabase } from "@/lib/db";
+import { calculateAccuracy, getTimeLeft } from "@/lib/pure";
 import { PlayerStatsTable } from "@/components/PlayerStatsTable";
 import type { User } from "@supabase/supabase-js";
 
@@ -61,7 +61,10 @@ export function TypeTest({
   const gameRef = useRef(game);
   const router = useRouter();
 
-  // Keep gameRef in sync so the interval always reads fresh values without restarting
+  const wordsInSentence = game.sentence.split(" ");
+  const charCounter = game.sentence.length;
+  const accuracy = calculateAccuracy({ charCounter, mistakes: game.mistakes });
+
   useEffect(() => {
     gameRef.current = game;
   });
@@ -74,24 +77,40 @@ export function TypeTest({
       userRef.current = user;
 
       if (insertedRef.current) return;
-      insertedRef.current = true;
+      insertedRef.current = true; // claim the slot before any async work
 
       const { data: existing } = await supabase
-        .from("player-stats")
+        .from("player_stats")
         .select("name, wpm")
-        .eq("name", getDisplayName(user))
+        .eq("user_id", user.id)
+        .eq("race_id", raceId)
         .maybeSingle();
 
       if (!existing) {
-        await supabase.from("player-stats").insert({
+        const { error } = await supabase.from("player_stats").insert({
           name: getDisplayName(user),
+          race_id: raceId,
+          user_id: user.id,
         });
-      } else if (existing.wpm) {
-        setGame((prev) => ({ ...prev, wpm: existing.wpm }));
+        if (error) insertedRef.current = false;
+      } else {
+        if (existing.wpm) {
+          setGame((prev) => ({ ...prev, wpm: existing.wpm }));
+        }
       }
     };
 
     ensurePlayerRow();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") {
+        ensurePlayerRow();
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, [raceId]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,21 +124,20 @@ export function TypeTest({
 
       const words = game.sentence.split(" ");
       const sentenceLength = game.sentence.length;
-      const accuracy =
-        sentenceLength > 0
-          ? Math.round(
-              ((sentenceLength - game.mistakes) / sentenceLength) * 100,
-            )
-          : 100;
+      const accuracy = calculateAccuracy({
+        charCounter: sentenceLength,
+        mistakes: game.mistakes,
+      });
 
       await supabase
-        .from("player-stats")
+        .from("player_stats")
         .update({
           wpm: game.wpm,
           accuracy,
           live_progress: words[game.currentWordIndex] ?? "|",
         })
-        .eq("name", getDisplayName(user));
+        .eq("user_id", user.id)
+        .eq("race_id", raceId);
     }, 2000);
 
     return () => clearInterval(interval);
@@ -130,9 +148,6 @@ export function TypeTest({
     roundStartedAt.current = performance.now() - elapsed;
     setGame((prev) => ({ ...prev, counter: getTimeLeft(endTime) }));
   }, []);
-
-  const wordsInSentence = game.sentence.split(" ");
-  const charCounter = game.sentence.length;
 
   useEffect(() => {
     const channel = supabase
@@ -146,7 +161,7 @@ export function TypeTest({
         },
         (payload) => {
           if (payload.eventType === "DELETE") {
-            router.push("/");
+            router.refresh();
           }
 
           if (payload.eventType === "UPDATE") {
@@ -254,11 +269,6 @@ export function TypeTest({
     }
   };
 
-  const calculateAccuracy = () => {
-    if (charCounter === 0) return 100;
-    return Math.round(((charCounter - game.mistakes) / charCounter) * 100);
-  };
-
   return (
     <div className="flex flex-col gap-2 p-4 max-w-150">
       <div>Round: {game.round}</div>
@@ -290,7 +300,7 @@ export function TypeTest({
       <PlayerStatsTable
         name={userRef.current ? getDisplayName(userRef.current) : ""}
         wpm={game.wpm}
-        accuracy={calculateAccuracy()}
+        accuracy={accuracy}
         live_progress={wordsInSentence[game.currentWordIndex] ?? "FINISHED"}
       />
     </div>
