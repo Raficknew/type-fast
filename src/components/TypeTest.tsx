@@ -1,33 +1,138 @@
 "use client";
 
+import { deleteRace, restartRace } from "@/actions/actions";
+import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
 import { supabase } from "@/lib/db";
-import { getRandomSentence } from "@/lib/pure";
+import { getTimeLeft } from "@/lib/pure";
+import { PlayerStatsTable } from "@/components/PlayerStatsTable";
+import type { User } from "@supabase/supabase-js";
+
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+
+function getDisplayName(user: User): string {
+  return (
+    user.user_metadata?.display_name ??
+    `Player #${user.id.slice(0, 6).toUpperCase()}`
+  );
+}
+
+type GameState = {
+  sentence: string;
+  round: number;
+  id: string;
+  currentText: string;
+  currentWordIndex: number;
+  correctWordsCount: number;
+  counter: number;
+  mistakes: number;
+  hasRoundEnded: boolean;
+  userHasFinished: boolean;
+  wpm: number;
+};
 
 export function TypeTest({
   sentence,
   round,
   raceId,
+  endTime,
 }: {
   sentence: string;
   round: number;
   raceId: string;
+  endTime: string;
 }) {
-  const [currentSentence, setCurrentSentence] = useState<string>(sentence);
-  const roundTime = 60; // seconds
-  const wordsInSentence = currentSentence.split(" ");
-  const charCounter = currentSentence.length;
+  const [game, setGame] = useState<GameState>({
+    sentence,
+    round,
+    id: raceId,
+    currentText: "",
+    currentWordIndex: 0,
+    correctWordsCount: 0,
+    counter: 0,
+    mistakes: 0,
+    hasRoundEnded: false,
+    userHasFinished: false,
+    wpm: 0,
+  });
+  const roundStartedAt = useRef<number>(0);
+  const userRef = useRef<User | null>(null);
+  const insertedRef = useRef(false);
+  const gameRef = useRef(game);
+  const router = useRouter();
 
-  const [currentText, setCurrentText] = useState<string>("");
-  const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
-  const [correctWordsCount, setCorrectWordsCount] = useState<number>(0);
-  const [counter, setCounter] = useState<number>(roundTime);
-  const [mistakes, setMistakes] = useState<number>(0);
+  // Keep gameRef in sync so the interval always reads fresh values without restarting
+  useEffect(() => {
+    gameRef.current = game;
+  });
 
-  const [hasRoundEnded, setHasRoundEnded] = useState<boolean>(false);
-  const [userHasFinished, setUserHasFinished] = useState<boolean>(false);
-  const [roundKey, setRoundKey] = useState<number>(round);
-  const WPM = useRef(0);
+  useEffect(() => {
+    const ensurePlayerRow = async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData.user;
+      if (!user) return;
+      userRef.current = user;
+
+      if (insertedRef.current) return;
+      insertedRef.current = true;
+
+      const { data: existing } = await supabase
+        .from("player-stats")
+        .select("name, wpm")
+        .eq("name", getDisplayName(user))
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from("player-stats").insert({
+          name: getDisplayName(user),
+        });
+      } else if (existing.wpm) {
+        setGame((prev) => ({ ...prev, wpm: existing.wpm }));
+      }
+    };
+
+    ensurePlayerRow();
+  }, [raceId]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const game = gameRef.current;
+      if (game.userHasFinished || game.hasRoundEnded) return;
+
+      const user = userRef.current;
+      if (!user) return;
+
+      const words = game.sentence.split(" ");
+      const sentenceLength = game.sentence.length;
+      const accuracy =
+        sentenceLength > 0
+          ? Math.round(
+              ((sentenceLength - game.mistakes) / sentenceLength) * 100,
+            )
+          : 100;
+
+      await supabase
+        .from("player-stats")
+        .update({
+          wpm: game.wpm,
+          accuracy,
+          live_progress: words[game.currentWordIndex] ?? "|",
+        })
+        .eq("name", getDisplayName(user));
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const elapsed = (ROUND_TIME - getTimeLeft(endTime)) * 1000;
+    roundStartedAt.current = performance.now() - elapsed;
+    setGame((prev) => ({ ...prev, counter: getTimeLeft(endTime) }));
+  }, []);
+
+  const wordsInSentence = game.sentence.split(" ");
+  const charCounter = game.sentence.length;
 
   useEffect(() => {
     const channel = supabase
@@ -40,7 +145,26 @@ export function TypeTest({
           table: "race",
         },
         (payload) => {
-          setCurrentSentence(payload.new.sentence);
+          if (payload.eventType === "DELETE") {
+            router.push("/");
+          }
+
+          if (payload.eventType === "UPDATE") {
+            roundStartedAt.current = performance.now();
+            setGame((prev) => ({
+              ...prev,
+              sentence: payload.new.sentence,
+              round: payload.new.round,
+              counter: ROUND_TIME,
+              currentText: "",
+              currentWordIndex: 0,
+              correctWordsCount: 0,
+              mistakes: 0,
+              hasRoundEnded: false,
+              userHasFinished: false,
+              wpm: 0,
+            }));
+          }
         },
       )
       .subscribe();
@@ -52,79 +176,78 @@ export function TypeTest({
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCounter((prevCounter) => {
-        if (prevCounter <= 1) {
-          clearInterval(timer);
-          setHasRoundEnded(true);
-          return 0;
-        }
-        return prevCounter - 1;
-      });
+      const elapsed = (performance.now() - roundStartedAt.current) / 1000;
+      const timeLeft = Math.round(ROUND_TIME - elapsed);
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        setGame((prev) => ({ ...prev, counter: 0, hasRoundEnded: true }));
+      } else {
+        setGame((prev) => ({ ...prev, counter: timeLeft }));
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [roundKey]);
+  }, [game.round]);
 
   useEffect(() => {
-    if (!hasRoundEnded && !userHasFinished && correctWordsCount > 0) {
-      WPM.current = Math.round(
-        (correctWordsCount / (roundTime - counter)) * 60,
-      );
+    if (
+      !game.hasRoundEnded &&
+      !game.userHasFinished &&
+      game.correctWordsCount > 0
+    ) {
+      setGame((prev) => ({
+        ...prev,
+        wpm: Math.round(
+          (prev.correctWordsCount / (ROUND_TIME - prev.counter)) * 60,
+        ),
+      }));
     }
-  }, [hasRoundEnded, userHasFinished, correctWordsCount, counter]);
-
-  const restartGame = async () => {
-    const newSentence = getRandomSentence();
-
-    await supabase
-      .from("race")
-      .update({ sentence: newSentence })
-      .eq("id", raceId);
-
-    setCurrentText("");
-    setCurrentWordIndex(0);
-    setCorrectWordsCount(0);
-    setCounter(roundTime);
-    setMistakes(0);
-    setHasRoundEnded(false);
-    setUserHasFinished(false);
-    WPM.current = 0;
-    setCurrentSentence(newSentence);
-    setRoundKey((prev) => prev + 1);
-  };
+  }, [
+    game.hasRoundEnded,
+    game.userHasFinished,
+    game.correctWordsCount,
+    game.counter,
+  ]);
 
   useEffect(() => {
-    if (hasRoundEnded) {
-      restartGame();
+    if (game.hasRoundEnded) {
+      if (game.round + 1 >= MAX_ROUNDS) {
+        deleteRace(raceId).catch(console.error);
+      } else {
+        restartRace(raceId, game.round).catch(() => {
+          setGame((prev) => ({ ...prev, hasRoundEnded: false }));
+        });
+      }
     }
-  }, [hasRoundEnded]);
+  }, [game.hasRoundEnded, game.round, raceId]);
 
   const handleWordCheck = (text: string) => {
-    const isCorrect = text.trim() === wordsInSentence[currentWordIndex];
-    const isLastWord = currentWordIndex === wordsInSentence.length - 1;
+    const isCorrect = text.trim() === wordsInSentence[game.currentWordIndex];
+    const isLastWord = game.currentWordIndex === wordsInSentence.length - 1;
 
     if (isCorrect) {
-      setCorrectWordsCount((prev) => prev + 1);
-      setCurrentWordIndex((prev) => prev + 1);
-      setCurrentText("");
-      if (isLastWord) {
-        setUserHasFinished(true);
-      }
+      setGame((prev) => ({
+        ...prev,
+        correctWordsCount: prev.correctWordsCount + 1,
+        currentWordIndex: prev.currentWordIndex + 1,
+        currentText: "",
+        userHasFinished: isLastWord ? true : prev.userHasFinished,
+      }));
     } else {
-      setMistakes((prev) => prev + 1);
+      setGame((prev) => ({ ...prev, mistakes: prev.mistakes + 1 }));
     }
   };
 
   const handleInputChange = (text: string) => {
-    const isDeleting = text.length < currentText.length;
-    setCurrentText(text);
+    const isDeleting = text.length < game.currentText.length;
+    setGame((prev) => ({ ...prev, currentText: text }));
 
     if (text.endsWith(" ")) {
       handleWordCheck(text);
     } else if (!isDeleting) {
       for (let i = 0; i < text.length; i++) {
-        if (text[i] !== wordsInSentence[currentWordIndex][i]) {
-          setMistakes((prev) => prev + 1);
+        if (text[i] !== wordsInSentence[game.currentWordIndex][i]) {
+          setGame((prev) => ({ ...prev, mistakes: prev.mistakes + 1 }));
           break;
         }
       }
@@ -133,36 +256,43 @@ export function TypeTest({
 
   const calculateAccuracy = () => {
     if (charCounter === 0) return 100;
-    return Math.round(((charCounter - mistakes) / charCounter) * 100);
+    return Math.round(((charCounter - game.mistakes) / charCounter) * 100);
   };
 
   return (
-    <div className="flex flex-col gap-2 p-4 max-w-125">
-      <div className="text-center text-2xl">Next Round in: {counter}</div>
-      <div className="text-xl mb-4 bg-gray-100 p-2 rounded-sm">
-        {currentSentence}
+    <div className="flex flex-col gap-2 p-4 max-w-150">
+      <div>Round: {game.round}</div>
+      <div className="text-center text-2xl">Next Round in {game.counter}s</div>
+      <div className="text-xl mb-4 bg-gray-100 p-2 rounded-sm select-none grow">
+        {wordsInSentence.map((word, i) => (
+          <span
+            key={`${word}#${i}`}
+            className={
+              i < game.currentWordIndex
+                ? "text-green-600"
+                : i === game.currentWordIndex
+                  ? "font-bold underline"
+                  : "text-gray-500"
+            }
+          >
+            {word}
+            {i < wordsInSentence.length - 1 ? " " : ""}
+          </span>
+        ))}
       </div>
       <input
         type="text"
         className="border rounded-sm p-1 w-full"
-        value={currentText}
+        value={game.currentText}
         onChange={(e) => handleInputChange(e.target.value)}
-        disabled={hasRoundEnded || userHasFinished}
+        disabled={game.hasRoundEnded || game.userHasFinished}
       />
-      <table className="text-center">
-        <thead>
-          <tr>
-            <th>WPM</th>
-            <th>Accuracy</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>{WPM.current}</td>
-            <td>{calculateAccuracy()}%</td>
-          </tr>
-        </tbody>
-      </table>
+      <PlayerStatsTable
+        name={userRef.current ? getDisplayName(userRef.current) : ""}
+        wpm={game.wpm}
+        accuracy={calculateAccuracy()}
+        live_progress={wordsInSentence[game.currentWordIndex] ?? "FINISHED"}
+      />
     </div>
   );
 }
