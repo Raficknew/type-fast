@@ -1,8 +1,8 @@
-import { createRace } from "@/actions/actions";
+import { createRace } from "@/actions/race";
 import { PlayerName } from "@/components/PlayerName";
 import { StartGameButton } from "@/components/StartGameButton";
 import { TypeTest } from "@/components/TypeTest";
-import { supabase } from "@/lib/db";
+import { supabaseServer as supabase } from "@/lib/db";
 
 export default async function TypeFastGamePage() {
   let hasGameStarted = false;

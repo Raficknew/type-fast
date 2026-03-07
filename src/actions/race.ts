@@ -1,9 +1,9 @@
 "use server";
 
-import { MAX_ROUNDS } from "@/gameSettings";
-import { supabase } from "@/lib/db";
-import { getRandomSentence, getRoundEndTime } from "@/lib/pure";
 import { revalidatePath } from "next/cache";
+import { MAX_ROUNDS } from "@/gameSettings";
+import { supabaseServer as supabase } from "@/lib/db";
+import { getRandomSentence, getRoundEndTime } from "@/lib/pure";
 
 export const createRace = async () => {
   const { data: existingRaces } = await supabase
@@ -21,12 +21,11 @@ export const createRace = async () => {
 
   const { error } = await supabase.from("race").insert({
     sentence: randomSentence,
-    round: 1,
     end_time: newRoundEndTime,
   });
 
   if (error) {
-    throw new Error("Failed to create race");
+    throw new Error(error.message);
   }
 
   revalidatePath("/");
@@ -41,6 +40,7 @@ export const deleteRace = async (raceId: string) => {
 
   if (fetchError || !data) {
     revalidatePath("/");
+    return;
   }
 
   if (data.round < MAX_ROUNDS - 1) {
@@ -52,8 +52,6 @@ export const deleteRace = async (raceId: string) => {
   if (error) {
     throw new Error("Failed to delete race");
   }
-
-  await supabase.from("player-stats").delete().neq("id", 0);
 
   revalidatePath("/");
 };
