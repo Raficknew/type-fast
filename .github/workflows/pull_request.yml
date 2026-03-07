@@ -46,6 +46,8 @@ jobs:
   doctor:
     needs: lint
     runs-on: ubuntu-latest
+    env:
+      NO_COLOR: "1"
     steps:
       - uses: actions/checkout@v5
         with:
