@@ -1,7 +1,7 @@
 "use client";
 
-import { supabase } from "@/lib/db";
 import { useEffect, useState } from "react";
+import { supabaseClient as supabase } from "@/lib/db";
 
 type PlayerStat = {
   id: number;
@@ -27,7 +27,7 @@ export function PlayerStatsTable({
   useEffect(() => {
     const fetchPlayers = async () => {
       const { data } = await supabase
-        .from("player-stats")
+        .from("player_stats")
         .select("*")
         .order("name");
       if (data) setPlayers(data);
@@ -36,10 +36,10 @@ export function PlayerStatsTable({
     fetchPlayers();
 
     const channel = supabase
-      .channel("public:player-stats")
+      .channel("public:player_stats")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "player-stats" },
+        { event: "*", schema: "public", table: "player_stats" },
         () => fetchPlayers(),
       )
       .subscribe();

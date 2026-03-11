@@ -1,7 +1,7 @@
 "use client";
-import { supabase } from "@/lib/db";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { supabaseClient as supabase } from "@/lib/db";
 
 export function StartGameButton({
   createRace,
@@ -9,6 +9,7 @@ export function StartGameButton({
   createRace: () => Promise<void>;
 }) {
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const channel = supabase
@@ -21,7 +22,7 @@ export function StartGameButton({
           table: "race",
         },
         () => {
-          redirect("/");
+          router.refresh();
         },
       )
       .subscribe();
