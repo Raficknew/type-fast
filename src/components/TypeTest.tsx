@@ -222,6 +222,7 @@ export function TypeTest({
         currentWordIndex: prev.currentWordIndex + 1,
         currentText: "",
         userHasFinished: isLastWord ? true : prev.userHasFinished,
+        hasRoundEnded: isLastWord ? true : prev.hasRoundEnded,
       }));
       if (isLastWord && userRef.current) {
         updatePlayerLiveStats(
@@ -253,7 +254,11 @@ export function TypeTest({
 
     setGame((prev) => ({ ...prev, currentText: text }));
 
+    const isLastWord = game.currentWordIndex === wordsInSentence.length - 1;
+
     if (text.endsWith(" ")) {
+      handleWordCheck(text);
+    } else if (isLastWord && text === wordsInSentence[game.currentWordIndex]) {
       handleWordCheck(text);
     } else if (!isDeleting) {
       for (let i = 0; i < text.length; i++) {
@@ -283,6 +288,7 @@ export function TypeTest({
         className="opacity-0 absolute left-0 top-0 w-full h-full"
         value={game.currentText}
         onChange={(e) => handleInputChange(e.target.value)}
+        onPaste={(e) => e.preventDefault()}
         disabled={game.hasRoundEnded || game.userHasFinished}
       />
       <PlayerStatsTable

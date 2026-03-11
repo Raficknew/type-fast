@@ -59,7 +59,7 @@ export function GameSentence({
                   .join(" ")
                   .trim()}
               >
-                {char}
+                {isTyped && !isCorrect ? typedSoFar[idx] : char}
               </span>
             );
           })}

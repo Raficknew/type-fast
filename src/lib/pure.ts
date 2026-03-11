@@ -22,7 +22,10 @@ export const calculateAccuracy = ({
   mistakes: number;
 }) => {
   if (charCounter === 0) return 100;
-  return Math.round(((charCounter - mistakes) / charCounter) * 100);
+  return Math.max(
+    0,
+    Math.round(((charCounter - mistakes) / charCounter) * 100),
+  );
 };
 
 export const getUserName = (user: User): string => {
