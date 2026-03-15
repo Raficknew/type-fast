@@ -1,18 +1,12 @@
-import { createRace } from "@/actions/race";
 import { PlayerName } from "@/components/PlayerName";
 import { StartGameButton } from "@/components/StartGameButton";
 import { TypeTest } from "@/components/TypeTest";
-import { supabaseServer as supabase } from "@/lib/db";
+import { createRace, getRace } from "@/features/race/actions/race";
 
 export default async function TypeFastGamePage() {
-  let hasGameStarted = false;
-  const { data } = await supabase.from("race").select();
+  const race = await getRace().catch(() => null);
 
-  if (data && data.length > 0) {
-    hasGameStarted = true;
-  }
-
-  if (!hasGameStarted || !data || data.length === 0) {
+  if (!race) {
     return (
       <div className="flex flex-col items-center gap-4">
         <PlayerName />
@@ -25,10 +19,10 @@ export default async function TypeFastGamePage() {
     <div className="flex flex-col items-center gap-4 w-full">
       <PlayerName />
       <TypeTest
-        sentence={data[0].sentence}
-        round={data[0].round}
-        raceId={data[0].id}
-        endTime={data[0].end_time}
+        sentence={race.sentence}
+        round={race.round}
+        raceId={race.id}
+        endTime={race.end_time}
       />
     </div>
   );
