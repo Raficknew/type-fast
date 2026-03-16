@@ -133,10 +133,15 @@ export function TypeTest({
 
       const words = game.sentence.split(" ");
       const sentenceLength = game.sentence.length;
+      const wpm = Math.round(
+        (game.correctWordsCount / (ROUND_TIME - game.counter)) * 60,
+      );
       const accuracy = calculateAccuracy({
         charCounter: sentenceLength,
         mistakes: game.mistakes,
       });
+
+      game.wpm = wpm;
 
       await updatePlayerLiveStats(
         raceId,
