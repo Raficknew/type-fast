@@ -26,7 +26,7 @@ export const ensurePlayerRoundRow = async (
   userId: string,
   displayName: string,
   round: number,
-): Promise<number | null> => {
+): Promise<Omit<PlayerStat, "id" | "name"> | null> => {
   const { error: upsertError } = await supabase.from("player_stats").upsert(
     {
       name: displayName,
@@ -79,7 +79,7 @@ export const ensurePlayerRoundRow = async (
 
   const { data: row, error: fetchError } = await supabase
     .from("player_stats")
-    .select("wpm")
+    .select("wpm, accuracy, live_progress, round")
     .eq("user_id", userId)
     .eq("race_id", raceId)
     .eq("round", round)
@@ -89,7 +89,12 @@ export const ensurePlayerRoundRow = async (
     throw new Error(fetchError.message);
   }
 
-  return row?.wpm ?? null;
+  return {
+    wpm: row?.wpm,
+    accuracy: row?.accuracy ?? null,
+    live_progress: row?.live_progress ?? null,
+    round: row?.round ?? null,
+  };
 };
 
 export const updatePlayerLiveStats = async (
@@ -100,14 +105,10 @@ export const updatePlayerLiveStats = async (
   accuracy: number,
   liveProgress: string,
 ): Promise<void> => {
-  const { error } = await supabase
+  await supabase
     .from("player_stats")
     .update({ wpm, accuracy, live_progress: liveProgress })
     .eq("user_id", userId)
     .eq("race_id", raceId)
     .eq("round", round);
-
-  if (error) {
-    throw new Error(error.message);
-  }
 };

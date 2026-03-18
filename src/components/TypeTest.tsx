@@ -57,17 +57,43 @@ export function TypeTest({
       insertedRoundsRef.current.add(targetRound);
 
       try {
-        const existingWpm = await ensurePlayerRoundRow(
+        const existingStats = await ensurePlayerRoundRow(
           raceId,
           user.id,
           getUserName(user),
           targetRound,
         );
 
-        if (existingWpm !== null) {
-          setGame((prev) =>
-            prev.round === targetRound ? { ...prev, wpm: existingWpm } : prev,
-          );
+        if (existingStats !== null) {
+          setGame((prev) => {
+            if (
+              prev.round !== targetRound ||
+              prev.round !== existingStats.round
+            )
+              return prev;
+
+            const words = prev.sentence.split(" ");
+            const progressIndex =
+              existingStats.live_progress === "FINISHED"
+                ? words.length
+                : words.indexOf(existingStats.live_progress);
+            const currentWordIndex = progressIndex === -1 ? 0 : progressIndex;
+            let mistakes = 0;
+            if (existingStats.accuracy > 0) {
+              mistakes = Math.round(
+                charCounter * (1 - existingStats.accuracy / 100),
+              );
+            }
+
+            return {
+              ...prev,
+              wpm: existingStats.wpm,
+              accuracy: existingStats.accuracy,
+              correctWordsCount: currentWordIndex,
+              currentWordIndex,
+              mistakes,
+            };
+          });
         }
       } catch (error) {
         insertedRoundsRef.current.delete(targetRound);
@@ -82,7 +108,7 @@ export function TypeTest({
         );
       }
     },
-    [raceId],
+    [raceId, charCounter],
   );
 
   useEffect(() => {

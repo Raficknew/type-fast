@@ -70,7 +70,11 @@ export function PlayerStatsTable({
               </td>
               <td className="py-2 pr-4">{player.name}</td>
               <td className="py-2 pr-4">
-                {isCurrentUser ? (wpm ?? 0) : (player.wpm ?? 0)}
+                {isCurrentUser
+                  ? Number.isFinite(wpm)
+                    ? wpm
+                    : 0
+                  : (player.wpm ?? 0)}
               </td>
               <td className="py-2">
                 {isCurrentUser ? (accuracy ?? 0) : (player.accuracy ?? 0)}%
