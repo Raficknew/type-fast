@@ -12,3 +12,12 @@ export type GameState = {
   wpm: number;
   isWordWrong: boolean;
 };
+
+export type PlayerStat = {
+  id: number;
+  name: string;
+  round: number;
+  wpm: number;
+  accuracy: number;
+  live_progress: string;
+};

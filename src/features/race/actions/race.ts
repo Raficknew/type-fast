@@ -61,6 +61,36 @@ export const restartRace = async (raceId: string, currentRound: number) => {
     throw new Error("Race has already ended");
   }
 
+  const { data: race, error: raceError } = await supabase
+    .from("race")
+    .select("end_time")
+    .eq("id", raceId)
+    .eq("round", currentRound)
+    .single();
+
+  if (raceError || !race) {
+    throw new Error("Race state is out of date");
+  }
+
+  const { data: players, error: playersError } = await supabase
+    .from("player_stats")
+    .select("live_progress")
+    .eq("race_id", raceId)
+    .eq("round", currentRound);
+
+  if (playersError) {
+    throw new Error(playersError.message);
+  }
+
+  const roundExpired = new Date(race.end_time).getTime() <= Date.now();
+  const allPlayersFinished =
+    (players?.length ?? 0) > 0 &&
+    players.every((player) => player.live_progress === "FINISHED");
+
+  if (!roundExpired && !allPlayersFinished) {
+    throw new Error("Restart conditions not met");
+  }
+
   const newSentence = getRandomSentence();
   const newRoundEndTime = getRoundEndTime();
 
@@ -73,4 +103,20 @@ export const restartRace = async (raceId: string, currentRound: number) => {
     })
     .eq("id", raceId)
     .eq("round", currentRound);
+};
+
+export const getRace = async (raceId?: string) => {
+  let query = supabase.from("race").select();
+
+  if (raceId) {
+    query = query.eq("id", raceId);
+  } else {
+    query = query.limit(1);
+  }
+
+  const { data, error } = await query.single();
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data;
 };

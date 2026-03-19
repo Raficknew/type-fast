@@ -1,22 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getPlayerStats } from "@/features/player/actions/playerStats";
 import { supabaseClient as supabase } from "@/lib/db";
-
-type PlayerStat = {
-  id: number;
-  name: string;
-  wpm: number;
-  accuracy: number;
-  live_progress: string;
-};
+import type { PlayerStat } from "@/types/types";
 
 export function PlayerStatsTable({
+  raceId,
+  round,
   wpm,
   accuracy,
   live_progress,
   name,
 }: {
+  raceId: string;
+  round: number;
   wpm?: number;
   accuracy?: number;
   live_progress?: string;
@@ -26,11 +24,12 @@ export function PlayerStatsTable({
 
   useEffect(() => {
     const fetchPlayers = async () => {
-      const { data } = await supabase
-        .from("player_stats")
-        .select("*")
-        .order("name");
-      if (data) setPlayers(data);
+      try {
+        const data = await getPlayerStats(raceId, round);
+        setPlayers(data);
+      } catch (error) {
+        console.error("Failed to load player stats", { raceId, round }, error);
+      }
     };
 
     fetchPlayers();
@@ -47,7 +46,7 @@ export function PlayerStatsTable({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [raceId, round]);
 
   return (
     <table className="w-full text-left border-collapse text-sm">
@@ -71,7 +70,11 @@ export function PlayerStatsTable({
               </td>
               <td className="py-2 pr-4">{player.name}</td>
               <td className="py-2 pr-4">
-                {isCurrentUser ? (wpm ?? 0) : (player.wpm ?? 0)}
+                {isCurrentUser
+                  ? Number.isFinite(wpm)
+                    ? wpm
+                    : 0
+                  : (player.wpm ?? 0)}
               </td>
               <td className="py-2">
                 {isCurrentUser ? (accuracy ?? 0) : (player.accuracy ?? 0)}%

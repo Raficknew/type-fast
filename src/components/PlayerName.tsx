@@ -1,15 +1,8 @@
 "use client";
 
-import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { supabaseClient as supabase } from "@/lib/db";
-
-function getDisplayName(user: User): string {
-  return (
-    user.user_metadata?.display_name ??
-    `Player #${user.id.slice(0, 6).toUpperCase()}`
-  );
-}
+import { getUserName } from "@/lib/pure";
 
 export function PlayerName() {
   const [name, setName] = useState<string | null>(null);
@@ -18,7 +11,7 @@ export function PlayerName() {
     const getUser = async () => {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
-        setName(getDisplayName(data.user));
+        setName(getUserName(data.user));
       }
     };
 
@@ -27,7 +20,7 @@ export function PlayerName() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (session?.user) {
-          setName(getDisplayName(session.user));
+          setName(getUserName(session.user));
         }
       },
     );
@@ -35,7 +28,9 @@ export function PlayerName() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  if (!name) return null;
+  if (!name) {
+    return <div>Loading Player...</div>;
+  }
 
   return (
     <p className="text-smą">

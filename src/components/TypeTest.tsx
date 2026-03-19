@@ -2,10 +2,13 @@
 
 import type { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { ensurePlayerRow, updatePlayerLiveStats } from "@/actions/playerStats";
-import { deleteRace, restartRace } from "@/actions/race";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PlayerStatsTable } from "@/components/PlayerStatsTable";
+import {
+  ensurePlayerRoundRow,
+  updatePlayerLiveStats,
+} from "@/features/player/actions/playerStats";
+import { deleteRace, restartRace } from "@/features/race/actions/race";
 import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
 import { supabaseClient as supabase } from "@/lib/db";
 import { calculateAccuracy, getTimeLeft, getUserName } from "@/lib/pure";
@@ -39,7 +42,7 @@ export function TypeTest({
   });
   const roundStartedAt = useRef<number>(0);
   const userRef = useRef<User | null>(null);
-  const insertedRef = useRef(false);
+  const insertedRoundsRef = useRef<Set<number>>(new Set());
   const gameRef = useRef(game);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -47,6 +50,66 @@ export function TypeTest({
   const wordsInSentence = game.sentence.split(" ");
   const charCounter = game.sentence.length;
   const accuracy = calculateAccuracy({ charCounter, mistakes: game.mistakes });
+
+  const ensureRoundRow = useCallback(
+    async (user: User, targetRound: number) => {
+      if (insertedRoundsRef.current.has(targetRound)) return;
+      insertedRoundsRef.current.add(targetRound);
+
+      try {
+        const existingStats = await ensurePlayerRoundRow(
+          raceId,
+          user.id,
+          getUserName(user),
+          targetRound,
+        );
+
+        if (existingStats !== null) {
+          setGame((prev) => {
+            if (
+              prev.round !== targetRound ||
+              prev.round !== existingStats.round
+            )
+              return prev;
+
+            const words = prev.sentence.split(" ");
+            const progressIndex =
+              existingStats.live_progress === "FINISHED"
+                ? words.length
+                : words.indexOf(existingStats.live_progress);
+            const currentWordIndex = progressIndex === -1 ? 0 : progressIndex;
+            let mistakes = 0;
+            if (existingStats.accuracy > 0) {
+              mistakes = Math.round(
+                charCounter * (1 - existingStats.accuracy / 100),
+              );
+            }
+
+            return {
+              ...prev,
+              wpm: existingStats.wpm,
+              accuracy: existingStats.accuracy,
+              correctWordsCount: currentWordIndex,
+              currentWordIndex,
+              mistakes,
+            };
+          });
+        }
+      } catch (error) {
+        insertedRoundsRef.current.delete(targetRound);
+        console.error(
+          "Failed to ensure player_stats row",
+          {
+            raceId,
+            userId: user.id,
+            round: targetRound,
+          },
+          error,
+        );
+      }
+    },
+    [raceId, charCounter],
+  );
 
   useEffect(() => {
     gameRef.current = game;
@@ -64,21 +127,7 @@ export function TypeTest({
       if (!user) return;
       userRef.current = user;
 
-      if (insertedRef.current) return;
-      insertedRef.current = true;
-
-      const existingWpm = await ensurePlayerRow(
-        raceId,
-        user.id,
-        getUserName(user),
-      ).catch(() => {
-        insertedRef.current = false;
-        return null;
-      });
-
-      if (existingWpm) {
-        setGame((prev) => ({ ...prev, wpm: existingWpm }));
-      }
+      await ensureRoundRow(user, gameRef.current.round);
     };
 
     initPlayer();
@@ -92,7 +141,13 @@ export function TypeTest({
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [raceId]);
+  }, [ensureRoundRow]);
+
+  useEffect(() => {
+    const user = userRef.current;
+    if (!user) return;
+    void ensureRoundRow(user, game.round);
+  }, [ensureRoundRow, game.round]);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -104,14 +159,20 @@ export function TypeTest({
 
       const words = game.sentence.split(" ");
       const sentenceLength = game.sentence.length;
+      const wpm = Math.round(
+        (game.correctWordsCount / (ROUND_TIME - game.counter)) * 60,
+      );
       const accuracy = calculateAccuracy({
         charCounter: sentenceLength,
         mistakes: game.mistakes,
       });
 
+      game.wpm = wpm;
+
       await updatePlayerLiveStats(
         raceId,
         user.id,
+        game.round,
         game.wpm,
         accuracy,
         words[game.currentWordIndex],
@@ -200,15 +261,51 @@ export function TypeTest({
   }, [game.hasRoundEnded, game.userHasFinished, game.correctWordsCount]);
 
   useEffect(() => {
-    if (game.hasRoundEnded) {
+    if (!game.hasRoundEnded) return;
+
+    let isCancelled = false;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const tryAdvanceRound = async () => {
+      if (isCancelled) return;
+
       if (game.round + 1 >= MAX_ROUNDS) {
-        deleteRace(raceId).catch(console.error);
-      } else {
-        restartRace(raceId, game.round).catch(() => {
-          setGame((prev) => ({ ...prev, hasRoundEnded: false }));
-        });
+        try {
+          await deleteRace(raceId);
+        } catch (error) {
+          console.error(error);
+        }
+        return;
       }
-    }
+
+      try {
+        await restartRace(raceId, game.round);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+
+        if (message.includes("Restart conditions not met") && !isCancelled) {
+          retryTimeout = setTimeout(() => {
+            void tryAdvanceRound();
+          }, 500);
+          return;
+        }
+
+        if (message.includes("Race state is out of date")) {
+          return;
+        }
+        console.error(error);
+      }
+    };
+
+    void tryAdvanceRound();
+
+    return () => {
+      isCancelled = true;
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
   }, [game.hasRoundEnded, game.round, raceId]);
 
   const handleWordCheck = (text: string) => {
@@ -228,6 +325,7 @@ export function TypeTest({
         updatePlayerLiveStats(
           raceId,
           userRef.current.id,
+          game.round,
           game.wpm,
           accuracy,
           "FINISHED",
@@ -292,6 +390,8 @@ export function TypeTest({
         disabled={game.hasRoundEnded || game.userHasFinished}
       />
       <PlayerStatsTable
+        raceId={raceId}
+        round={game.round}
         name={userRef.current ? getUserName(userRef.current) : ""}
         wpm={game.wpm}
         accuracy={accuracy}
