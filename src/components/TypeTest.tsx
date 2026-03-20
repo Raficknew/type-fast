@@ -8,7 +8,7 @@ import {
   ensurePlayerRoundRow,
   updatePlayerLiveStats,
 } from "@/features/player/actions/playerStats";
-import { deleteRace, restartRace } from "@/features/race/actions/race";
+import { restartRace } from "@/features/race/actions/race";
 import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
 import { supabaseClient as supabase } from "@/lib/db";
 import { calculateAccuracy, getTimeLeft, getUserName } from "@/lib/pure";
@@ -144,12 +144,6 @@ export function TypeTest({
   }, [ensureRoundRow]);
 
   useEffect(() => {
-    const user = userRef.current;
-    if (!user) return;
-    void ensureRoundRow(user, game.round);
-  }, [ensureRoundRow, game.round]);
-
-  useEffect(() => {
     const interval = setInterval(async () => {
       const game = gameRef.current;
       if (game.userHasFinished || game.hasRoundEnded) return;
@@ -194,32 +188,26 @@ export function TypeTest({
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "UPDATE",
           schema: "public",
           table: "race",
         },
         (payload) => {
-          if (payload.eventType === "DELETE") {
-            router.refresh();
-          }
-
-          if (payload.eventType === "UPDATE") {
-            roundStartedAt.current = performance.now();
-            setGame((prev) => ({
-              ...prev,
-              sentence: payload.new.sentence,
-              round: payload.new.round,
-              counter: ROUND_TIME,
-              currentText: "",
-              currentWordIndex: 0,
-              correctWordsCount: 0,
-              mistakes: 0,
-              hasRoundEnded: false,
-              userHasFinished: false,
-              wpm: 0,
-              isWordWrong: false,
-            }));
-          }
+          roundStartedAt.current = performance.now();
+          setGame((prev) => ({
+            ...prev,
+            sentence: payload.new.sentence,
+            round: payload.new.round,
+            counter: ROUND_TIME,
+            currentText: "",
+            currentWordIndex: 0,
+            correctWordsCount: 0,
+            mistakes: 0,
+            hasRoundEnded: false,
+            userHasFinished: false,
+            wpm: 0,
+            isWordWrong: false,
+          }));
         },
       )
       .subscribe();
@@ -227,7 +215,7 @@ export function TypeTest({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [router.refresh]);
+  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: game.round is used as a trigger to restart the timer on each new round
   useEffect(() => {
@@ -270,11 +258,7 @@ export function TypeTest({
       if (isCancelled) return;
 
       if (game.round + 1 >= MAX_ROUNDS) {
-        try {
-          await deleteRace(raceId);
-        } catch (error) {
-          console.error(error);
-        }
+        router.push(`/results/${raceId}`);
         return;
       }
 
@@ -286,7 +270,7 @@ export function TypeTest({
 
         if (message.includes("Restart conditions not met") && !isCancelled) {
           retryTimeout = setTimeout(() => {
-            void tryAdvanceRound();
+            tryAdvanceRound();
           }, 500);
           return;
         }
@@ -298,7 +282,7 @@ export function TypeTest({
       }
     };
 
-    void tryAdvanceRound();
+    tryAdvanceRound();
 
     return () => {
       isCancelled = true;
@@ -306,7 +290,7 @@ export function TypeTest({
         clearTimeout(retryTimeout);
       }
     };
-  }, [game.hasRoundEnded, game.round, raceId]);
+  }, [game.hasRoundEnded, game.round, raceId, router]);
 
   const handleWordCheck = (text: string) => {
     const isCorrect = text.trim() === wordsInSentence[game.currentWordIndex];

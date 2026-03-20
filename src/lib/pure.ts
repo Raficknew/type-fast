@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { ROUND_TIME } from "@/gameSettings";
+import type { PlayerStat } from "@/types/types";
 import { sentences } from "./sentences";
 
 export const getRoundEndTime = () => {
@@ -33,4 +34,35 @@ export const getUserName = (user: User): string => {
     user.user_metadata?.display_name ??
     `Player #${user.id.slice(0, 6).toUpperCase()}`
   );
+};
+
+export const summarizeResultsForPlayers = (playerStats: PlayerStat[]) => {
+  const playerMap = new Map<string, PlayerStat[]>();
+  const summarizedResults = [];
+
+  for (const playerStat of playerStats) {
+    if (playerMap.has(playerStat.name)) {
+      playerMap.get(playerStat.name)?.push(playerStat);
+    } else {
+      playerMap.set(playerStat.name, [playerStat]);
+    }
+  }
+
+  for (const [name, stats] of playerMap.entries()) {
+    const averageAccuracy =
+      stats.reduce((sum, stat) => sum + stat.accuracy, 0) / stats.length;
+    const averageWpm =
+      stats.reduce((sum, stat) => sum + stat.wpm, 0) / stats.length;
+
+    summarizedResults.push({
+      name,
+      averageAccuracy: Math.round(averageAccuracy * 100) / 100,
+      averageWpm: Math.round(averageWpm * 100) / 100,
+      roundsPlayed: stats.length,
+    });
+  }
+
+  return summarizedResults
+    .sort((a, b) => b.roundsPlayed - a.roundsPlayed)
+    .sort((a, b) => b.averageWpm - a.averageWpm);
 };
