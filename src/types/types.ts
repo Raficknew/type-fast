@@ -21,3 +21,11 @@ export type PlayerStat = {
   accuracy: number;
   live_progress: string;
 };
+
+export type PlayerResult = {
+  name: string;
+  averageWpm: number;
+  averageAccuracy: number;
+  roundsPlayed: number;
+  postion?: number;
+};

@@ -2,9 +2,11 @@
 import { useEffect, useState } from "react";
 
 export function RaceTimer({
+  title,
   endTime,
   action,
 }: {
+  title: string;
   endTime: string;
   action: () => void;
 }) {
@@ -27,5 +29,9 @@ export function RaceTimer({
     return () => clearInterval(timer);
   }, [endTime, action]);
 
-  return <div>Timer: {counter}</div>;
+  return (
+    <div>
+      {title}: {counter}
+    </div>
+  );
 }

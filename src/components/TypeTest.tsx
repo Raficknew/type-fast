@@ -188,26 +188,32 @@ export function TypeTest({
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          event: "*",
           schema: "public",
           table: "race",
         },
         (payload) => {
-          roundStartedAt.current = performance.now();
-          setGame((prev) => ({
-            ...prev,
-            sentence: payload.new.sentence,
-            round: payload.new.round,
-            counter: ROUND_TIME,
-            currentText: "",
-            currentWordIndex: 0,
-            correctWordsCount: 0,
-            mistakes: 0,
-            hasRoundEnded: false,
-            userHasFinished: false,
-            wpm: 0,
-            isWordWrong: false,
-          }));
+          if (payload.eventType === "DELETE") {
+            router.refresh();
+          }
+
+          if (payload.eventType === "UPDATE") {
+            roundStartedAt.current = performance.now();
+            setGame((prev) => ({
+              ...prev,
+              sentence: payload.new.sentence,
+              round: payload.new.round,
+              counter: ROUND_TIME,
+              currentText: "",
+              currentWordIndex: 0,
+              correctWordsCount: 0,
+              mistakes: 0,
+              hasRoundEnded: false,
+              userHasFinished: false,
+              wpm: 0,
+              isWordWrong: false,
+            }));
+          }
         },
       )
       .subscribe();
@@ -215,7 +221,7 @@ export function TypeTest({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [router.refresh]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: game.round is used as a trigger to restart the timer on each new round
   useEffect(() => {
