@@ -33,7 +33,7 @@ export default async function ResultsPage({
       {raceResults.map((player, index) => (
         <PlayerCard
           key={player.averageWpm}
-          player={{ ...player, postion: index + 1 }}
+          player={{ ...player, position: index + 1 }}
         />
       ))}
     </div>
@@ -43,7 +43,7 @@ export default async function ResultsPage({
 function PlayerCard({ player }: { player: PlayerResult }) {
   return (
     <div className="flex gap-2">
-      <div>{player.postion}.</div>
+      <div>{player.position}.</div>
       <div className="mb-4">
         <h2 className="text-lg font-semibold">{player.name}</h2>
         <p>Average WPM: {player.averageWpm}</p>

@@ -28,5 +28,5 @@ export type PlayerResult = {
   averageWpm: number;
   averageAccuracy: number;
   roundsPlayed: number;
-  postion?: number;
+  position?: number;
 };
