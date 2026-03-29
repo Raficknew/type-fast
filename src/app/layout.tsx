@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Outfit } from "next/font/google";
+import { Figtree, Geist, Geist_Mono, Outfit } from "next/font/google";
 import { AnonymousAuth } from "@/components/AnonymousAuth";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
+const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", outfit.variable)}>
+    <html lang="en" className={cn("font-sans", figtree.variable)}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased w-full h-screen flex items-center justify-center`}
       >
