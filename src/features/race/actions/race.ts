@@ -106,6 +106,13 @@ export const restartRace = async (raceId: string, currentRound: number) => {
     .eq("round", currentRound);
 };
 
+export const finalizeRace = async (raceId: string) => {
+  await supabase
+    .from("race")
+    .update({ end_time: getRoundEndTime() })
+    .eq("id", raceId);
+};
+
 export const getRace = async (raceId?: string) => {
   let query = supabase.from("race").select();
 

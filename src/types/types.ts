@@ -2,6 +2,7 @@ export type GameState = {
   sentence: string;
   round: number;
   id: string;
+  endTime: string;
   currentText: string;
   currentWordIndex: number;
   correctWordsCount: number;

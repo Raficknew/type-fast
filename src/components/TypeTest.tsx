@@ -8,12 +8,13 @@ import {
   ensurePlayerRoundRow,
   updatePlayerLiveStats,
 } from "@/features/player/actions/playerStats";
-import { restartRace } from "@/features/race/actions/race";
+import { finalizeRace, restartRace } from "@/features/race/actions/race";
 import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
 import { supabaseClient as supabase } from "@/lib/db";
-import { calculateAccuracy, getTimeLeft, getUserName } from "@/lib/pure";
+import { calculateAccuracy, getUserName } from "@/lib/pure";
 import type { GameState } from "@/types/types";
 import { GameSentence } from "./GameSentence";
+import { RaceTimer } from "./RaceTimer";
 
 export function TypeTest({
   sentence,
@@ -30,6 +31,7 @@ export function TypeTest({
     sentence,
     round,
     id: raceId,
+    endTime,
     currentText: "",
     currentWordIndex: 0,
     correctWordsCount: 0,
@@ -40,7 +42,6 @@ export function TypeTest({
     wpm: 0,
     isWordWrong: false,
   });
-  const roundStartedAt = useRef<number>(0);
   const userRef = useRef<User | null>(null);
   const insertedRoundsRef = useRef<Set<number>>(new Set());
   const gameRef = useRef(game);
@@ -145,42 +146,37 @@ export function TypeTest({
 
   useEffect(() => {
     const interval = setInterval(async () => {
-      const game = gameRef.current;
-      if (game.userHasFinished || game.hasRoundEnded) return;
+      const currentGame = gameRef.current;
+      if (currentGame.userHasFinished || currentGame.hasRoundEnded) return;
 
       const user = userRef.current;
       if (!user) return;
 
-      const words = game.sentence.split(" ");
-      const sentenceLength = game.sentence.length;
+      const words = currentGame.sentence.split(" ");
+      const sentenceLength = currentGame.sentence.length;
       const wpm = Math.round(
-        (game.correctWordsCount / (ROUND_TIME - game.counter)) * 60,
+        (currentGame.correctWordsCount / (ROUND_TIME - currentGame.counter)) *
+          60,
       );
-      const accuracy = calculateAccuracy({
+      const acc = calculateAccuracy({
         charCounter: sentenceLength,
-        mistakes: game.mistakes,
+        mistakes: currentGame.mistakes,
       });
 
-      game.wpm = wpm;
+      currentGame.wpm = wpm;
 
       await updatePlayerLiveStats(
         raceId,
         user.id,
-        game.round,
-        game.wpm,
-        accuracy,
-        words[game.currentWordIndex],
+        currentGame.round,
+        currentGame.wpm,
+        acc,
+        words[currentGame.currentWordIndex],
       );
     }, 2000);
 
     return () => clearInterval(interval);
   }, [raceId]);
-
-  useEffect(() => {
-    const elapsed = (ROUND_TIME - getTimeLeft(endTime)) * 1000;
-    roundStartedAt.current = performance.now() - elapsed;
-    setGame((prev) => ({ ...prev, counter: getTimeLeft(endTime) }));
-  }, [endTime]);
 
   useEffect(() => {
     const channel = supabase
@@ -198,11 +194,11 @@ export function TypeTest({
           }
 
           if (payload.eventType === "UPDATE") {
-            roundStartedAt.current = performance.now();
             setGame((prev) => ({
               ...prev,
               sentence: payload.new.sentence,
               round: payload.new.round,
+              endTime: payload.new.end_time,
               counter: ROUND_TIME,
               currentText: "",
               currentWordIndex: 0,
@@ -222,22 +218,6 @@ export function TypeTest({
       supabase.removeChannel(channel);
     };
   }, [router.refresh]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: game.round is used as a trigger to restart the timer on each new round
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const elapsed = (performance.now() - roundStartedAt.current) / 1000;
-      const timeLeft = Math.round(ROUND_TIME - elapsed);
-      if (timeLeft <= 0) {
-        clearInterval(timer);
-        setGame((prev) => ({ ...prev, counter: 0, hasRoundEnded: true }));
-      } else {
-        setGame((prev) => ({ ...prev, counter: timeLeft }));
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [game.round]);
 
   useEffect(() => {
     if (
@@ -264,6 +244,7 @@ export function TypeTest({
       if (isCancelled) return;
 
       if (game.round + 1 >= MAX_ROUNDS) {
+        await finalizeRace(raceId);
         router.push(`/results/${raceId}`);
         return;
       }
@@ -365,10 +346,23 @@ export function TypeTest({
         game.currentText
       : game.currentText;
 
+  const handleRoundEnd = useCallback(() => {
+    setGame((prev) => ({ ...prev, counter: 0, hasRoundEnded: true }));
+  }, []);
+
+  const handleTimerTick = useCallback((timeLeft: number) => {
+    setGame((prev) => ({ ...prev, counter: timeLeft }));
+  }, []);
+
   return (
     <div className="flex flex-col gap-2 p-4 max-w-150">
       <div>Round: {game.round}</div>
-      <div className="text-center text-2xl">Next Round in {game.counter}s</div>
+      <RaceTimer
+        title="Next Round in"
+        endTime={game.endTime}
+        action={handleRoundEnd}
+        onTick={handleTimerTick}
+      />
       <GameSentence game={game} typedSoFar={typedSoFar} />
       <input
         ref={inputRef}
