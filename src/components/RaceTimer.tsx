@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getTimeLeft } from "@/lib/pure";
 
 export function RaceTimer({
@@ -13,13 +13,22 @@ export function RaceTimer({
   action: () => void;
   onTick?: (timeLeft: number) => void;
 }) {
-  const [counter, setCounter] = useState(() => getTimeLeft(endTime));
+  const [counter, setCounter] = useState(0);
+  const startedAtRef = useRef<number>(0);
+  const initialTimeLeftRef = useRef<number>(0);
 
   useEffect(() => {
-    setCounter(getTimeLeft(endTime));
+    const initialTimeLeft = getTimeLeft(endTime);
+    initialTimeLeftRef.current = initialTimeLeft;
+    startedAtRef.current = performance.now();
+
+    setCounter(initialTimeLeft);
+    onTick?.(initialTimeLeft);
 
     const timer = setInterval(() => {
-      const timeLeft = getTimeLeft(endTime);
+      const elapsed = (performance.now() - startedAtRef.current) / 1000;
+      const timeLeft = Math.round(initialTimeLeftRef.current - elapsed);
+
       if (timeLeft <= 0) {
         clearInterval(timer);
         setCounter(0);

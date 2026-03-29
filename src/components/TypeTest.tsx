@@ -158,7 +158,7 @@ export function TypeTest({
         (currentGame.correctWordsCount / (ROUND_TIME - currentGame.counter)) *
           60,
       );
-      const acc = calculateAccuracy({
+      const accuracy = calculateAccuracy({
         charCounter: sentenceLength,
         mistakes: currentGame.mistakes,
       });
@@ -170,7 +170,7 @@ export function TypeTest({
         user.id,
         currentGame.round,
         currentGame.wpm,
-        acc,
+        accuracy,
         words[currentGame.currentWordIndex],
       );
     }, 2000);
