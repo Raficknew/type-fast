@@ -112,3 +112,21 @@ export const updatePlayerLiveStats = async (
     .eq("race_id", raceId)
     .eq("round", round);
 };
+
+export const getFinalPlayersStats = async (
+  raceId: string,
+): Promise<PlayerStat[]> => {
+  const { data, error } = await supabase
+    .from("player_stats")
+    .select("*")
+    .eq("race_id", raceId)
+    .order("wpm", { ascending: false })
+    .order("accuracy", { ascending: false })
+    .order("name");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+};

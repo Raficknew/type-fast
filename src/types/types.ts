@@ -2,6 +2,7 @@ export type GameState = {
   sentence: string;
   round: number;
   id: string;
+  endTime: string;
   currentText: string;
   currentWordIndex: number;
   correctWordsCount: number;
@@ -20,4 +21,12 @@ export type PlayerStat = {
   wpm: number;
   accuracy: number;
   live_progress: string;
+};
+
+export type PlayerResult = {
+  name: string;
+  averageWpm: number;
+  averageAccuracy: number;
+  roundsPlayed: number;
+  position?: number;
 };

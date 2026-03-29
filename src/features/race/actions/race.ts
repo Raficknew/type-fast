@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { MAX_ROUNDS } from "@/gameSettings";
 import { supabaseServer as supabase } from "@/lib/db";
 import { getRandomSentence, getRoundEndTime } from "@/lib/pure";
@@ -105,6 +106,13 @@ export const restartRace = async (raceId: string, currentRound: number) => {
     .eq("round", currentRound);
 };
 
+export const finalizeRace = async (raceId: string) => {
+  await supabase
+    .from("race")
+    .update({ end_time: getRoundEndTime() })
+    .eq("id", raceId);
+};
+
 export const getRace = async (raceId?: string) => {
   let query = supabase.from("race").select();
 
@@ -116,7 +124,7 @@ export const getRace = async (raceId?: string) => {
 
   const { data, error } = await query.single();
   if (error) {
-    throw new Error(error.message);
+    redirect("/");
   }
   return data;
 };

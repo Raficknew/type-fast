@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import { PlayerName } from "@/components/PlayerName";
 import { StartGameButton } from "@/components/StartGameButton";
 import { TypeTest } from "@/components/TypeTest";
 import { createRace, getRace } from "@/features/race/actions/race";
+import { MAX_ROUNDS } from "@/gameSettings";
 
 export default async function TypeFastGamePage() {
   const race = await getRace().catch(() => null);
@@ -13,6 +15,10 @@ export default async function TypeFastGamePage() {
         <StartGameButton createRace={createRace} />
       </div>
     );
+  }
+
+  if (race.round >= MAX_ROUNDS - 1) {
+    redirect(`/results/${race.id}`);
   }
 
   return (
