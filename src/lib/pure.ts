@@ -40,22 +40,24 @@ export const summarizeResultsForPlayers = (playerStats: PlayerStat[]) => {
   const summarizedResults: PlayerResult[] = [];
 
   for (const playerStat of playerStats) {
-    const existingStats = playerMap.get(playerStat.name);
+    const existingStats = playerMap.get(playerStat.user_id);
 
     if (existingStats) {
       existingStats.push(playerStat);
     } else {
-      playerMap.set(playerStat.name, [playerStat]);
+      playerMap.set(playerStat.user_id, [playerStat]);
     }
   }
 
-  for (const [name, stats] of playerMap.entries()) {
+  for (const [userId, stats] of playerMap.entries()) {
+    const name = stats[0].name;
     const averageAccuracy =
       stats.reduce((sum, stat) => sum + stat.accuracy, 0) / stats.length;
     const averageWpm =
       stats.reduce((sum, stat) => sum + stat.wpm, 0) / stats.length;
 
     summarizedResults.push({
+      userId,
       name,
       averageAccuracy: Math.round(averageAccuracy * 100) / 100,
       averageWpm: Math.round(averageWpm * 100) / 100,

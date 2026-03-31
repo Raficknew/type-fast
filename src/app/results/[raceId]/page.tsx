@@ -32,7 +32,7 @@ export default async function ResultsPage({
       />
       {raceResults.map((player, index) => (
         <PlayerCard
-          key={player.averageWpm}
+          key={player.userId}
           player={{ ...player, position: index + 1 }}
         />
       ))}

@@ -25,6 +25,8 @@ export function RaceTimer({
     setCounter(initialTimeLeft);
     onTick?.(initialTimeLeft);
 
+    let actionTimeout: ReturnType<typeof setTimeout> | null = null;
+
     const timer = setInterval(() => {
       const elapsed = (performance.now() - startedAtRef.current) / 1000;
       const timeLeft = Math.round(initialTimeLeftRef.current - elapsed);
@@ -33,14 +35,17 @@ export function RaceTimer({
         clearInterval(timer);
         setCounter(0);
         onTick?.(0);
-        setTimeout(() => action(), 500);
+        actionTimeout = setTimeout(() => action(), 500);
       } else {
         setCounter(timeLeft);
         onTick?.(timeLeft);
       }
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (actionTimeout) clearTimeout(actionTimeout);
+    };
   }, [endTime, action, onTick]);
 
   return (

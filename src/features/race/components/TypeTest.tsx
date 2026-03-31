@@ -198,21 +198,31 @@ export function TypeTest({
               router.push(`/results/${raceId}`);
               return;
             }
-            setGame((prev) => ({
-              ...prev,
-              sentence: payload.new.sentence,
-              round: payload.new.round,
-              endTime: payload.new.end_time,
-              counter: ROUND_TIME,
-              currentText: "",
-              currentWordIndex: 0,
-              correctWordsCount: 0,
-              mistakes: 0,
-              hasRoundEnded: false,
-              userHasFinished: false,
-              wpm: 0,
-              isWordWrong: false,
-            }));
+            const newRound = payload.new.round;
+            setGame((prev) => {
+              if (prev.round === newRound) {
+                return prev;
+              }
+              return {
+                ...prev,
+                sentence: payload.new.sentence,
+                round: newRound,
+                endTime: payload.new.end_time,
+                counter: ROUND_TIME,
+                currentText: "",
+                currentWordIndex: 0,
+                correctWordsCount: 0,
+                mistakes: 0,
+                hasRoundEnded: false,
+                userHasFinished: false,
+                wpm: 0,
+                isWordWrong: false,
+              };
+            });
+
+            if (userRef.current) {
+              ensureRoundRow(userRef.current, newRound);
+            }
           }
         },
       )
@@ -221,7 +231,7 @@ export function TypeTest({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [raceId, router]);
+  }, [raceId, router, ensureRoundRow]);
 
   useEffect(() => {
     if (
@@ -380,7 +390,7 @@ export function TypeTest({
       <PlayerStatsTable
         raceId={raceId}
         round={game.round}
-        name={userRef.current ? getUserName(userRef.current) : ""}
+        userId={userRef.current?.id}
         wpm={game.wpm}
         accuracy={accuracy}
         live_progress={wordsInSentence[game.currentWordIndex] ?? "FINISHED"}

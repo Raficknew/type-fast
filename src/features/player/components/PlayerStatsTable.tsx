@@ -11,14 +11,14 @@ export function PlayerStatsTable({
   wpm,
   accuracy,
   live_progress,
-  name,
+  userId,
 }: {
   raceId: string;
   round: number;
   wpm?: number;
   accuracy?: number;
   live_progress?: string;
-  name?: string;
+  userId?: string;
 }) {
   const [players, setPlayers] = useState<PlayerStat[]>([]);
 
@@ -60,7 +60,7 @@ export function PlayerStatsTable({
       </thead>
       <tbody>
         {players.map((player) => {
-          const isCurrentUser = player.name === name;
+          const isCurrentUser = player.user_id === userId;
           return (
             <tr key={player.id} className="border-b last:border-0">
               <td className="py-2 pr-4">

@@ -15,7 +15,8 @@ export type GameState = {
 };
 
 export type PlayerStat = {
-  id: number;
+  id: string;
+  user_id: string;
   name: string;
   round: number;
   wpm: number;
@@ -24,6 +25,7 @@ export type PlayerStat = {
 };
 
 export type PlayerResult = {
+  userId: string;
   name: string;
   averageWpm: number;
   averageAccuracy: number;
