@@ -31,8 +31,7 @@ export const calculateAccuracy = ({
 
 export const getUserName = (user: User): string => {
   return (
-    user.user_metadata?.display_name ??
-    `Player #${user.id.slice(0, 6).toUpperCase()}`
+    user.user_metadata?.name ?? `Player #${user.id.slice(0, 6).toUpperCase()}`
   );
 };
 

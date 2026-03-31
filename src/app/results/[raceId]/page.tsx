@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { RaceTimer } from "@/components/RaceTimer";
 import { getFinalPlayersStats } from "@/features/player/actions/playerStats";
 import { deleteRace, getRace } from "@/features/race/actions/race";
+import { RaceTimer } from "@/features/race/components/RaceTimer";
 import { summarizeResultsForPlayers } from "@/lib/pure";
 import type { PlayerResult } from "@/types/types";
 

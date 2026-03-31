@@ -3,17 +3,17 @@
 import type { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PlayerStatsTable } from "@/components/PlayerStatsTable";
 import {
   ensurePlayerRoundRow,
   updatePlayerLiveStats,
 } from "@/features/player/actions/playerStats";
+import { PlayerStatsTable } from "@/features/player/components/PlayerStatsTable";
 import { finalizeRace, restartRace } from "@/features/race/actions/race";
 import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
 import { supabaseClient as supabase } from "@/lib/db";
 import { calculateAccuracy, getUserName } from "@/lib/pure";
 import type { GameState } from "@/types/types";
-import { GameSentence } from "./GameSentence";
+import { GameSentence } from "../../../components/GameSentence";
 import { RaceTimer } from "./RaceTimer";
 
 export function TypeTest({
@@ -194,6 +194,10 @@ export function TypeTest({
           }
 
           if (payload.eventType === "UPDATE") {
+            if (payload.new.round >= MAX_ROUNDS) {
+              router.push(`/results/${raceId}`);
+              return;
+            }
             setGame((prev) => ({
               ...prev,
               sentence: payload.new.sentence,
@@ -217,7 +221,7 @@ export function TypeTest({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [router.refresh]);
+  }, [raceId, router]);
 
   useEffect(() => {
     if (
