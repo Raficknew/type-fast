@@ -6,7 +6,7 @@ import { supabaseClient as supabase } from "@/lib/db";
 import { getUserName } from "@/lib/pure";
 import { UserNameEditDialog } from "../../users/components/UserNameEditDialog";
 
-export function PlayerName() {
+export function PlayerName({ hasGameStarted }: { hasGameStarted?: boolean }) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -35,7 +35,9 @@ export function PlayerName() {
       <p>
         Playing as <span className="font-semibold">{name}</span>
       </p>
-      <UserNameEditDialog name={isGenerated ? undefined : name} />
+      {!hasGameStarted && (
+        <UserNameEditDialog name={isGenerated ? undefined : name} />
+      )}
     </div>
   );
 }

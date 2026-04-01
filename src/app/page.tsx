@@ -23,7 +23,7 @@ export default async function TypeFastGamePage() {
 
   return (
     <div className="flex flex-col items-center gap-4 w-full">
-      <PlayerName />
+      <PlayerName hasGameStarted={true} />
       <TypeTest
         sentence={race.sentence}
         round={race.round}
