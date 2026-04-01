@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getPlayerStats } from "@/features/player/actions/playerStats";
 import { supabaseClient as supabase } from "@/lib/db";
 import type { PlayerStat } from "@/types/types";
@@ -11,42 +11,74 @@ export function PlayerStatsTable({
   wpm,
   accuracy,
   live_progress,
-  name,
+  userId,
 }: {
   raceId: string;
   round: number;
   wpm?: number;
   accuracy?: number;
   live_progress?: string;
-  name?: string;
+  userId?: string;
 }) {
   const [players, setPlayers] = useState<PlayerStat[]>([]);
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sortedPlayers = players.sort((a, b) => b.wpm - a.wpm);
+
+  const fetchPlayers = useCallback(async () => {
+    try {
+      const data = await getPlayerStats(raceId, round);
+      setPlayers(data);
+    } catch (error) {
+      console.error("Failed to load player stats", { raceId, round }, error);
+    }
+  }, [raceId, round]);
+
+  const scheduleFetch = useCallback(() => {
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchTimeoutRef.current = null;
+      fetchPlayers();
+    }, 200);
+  }, [fetchPlayers]);
 
   useEffect(() => {
-    const fetchPlayers = async () => {
-      try {
-        const data = await getPlayerStats(raceId, round);
-        setPlayers(data);
-      } catch (error) {
-        console.error("Failed to load player stats", { raceId, round }, error);
-      }
-    };
-
     fetchPlayers();
 
     const channel = supabase
-      .channel("public:player_stats")
+      .channel(`public:player_stats:${raceId}:${round}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "player_stats" },
-        () => fetchPlayers(),
+        {
+          event: "*",
+          schema: "public",
+          table: "player_stats",
+          filter: `race_id=eq.${raceId}`,
+        },
+        (payload) => {
+          const player = (payload.new || payload.old) as {
+            round?: number;
+          };
+
+          if (player.round !== round) {
+            return;
+          }
+
+          scheduleFetch();
+        },
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
     };
-  }, [raceId, round]);
+  }, [raceId, round, fetchPlayers, scheduleFetch]);
 
   return (
     <table className="w-full text-left border-collapse text-sm">
@@ -59,8 +91,8 @@ export function PlayerStatsTable({
         </tr>
       </thead>
       <tbody>
-        {players.map((player) => {
-          const isCurrentUser = player.name === name;
+        {sortedPlayers.map((player) => {
+          const isCurrentUser = player.user_id === userId;
           return (
             <tr key={player.id} className="border-b last:border-0">
               <td className="py-2 pr-4">

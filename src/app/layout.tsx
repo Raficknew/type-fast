@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { AnonymousAuth } from "@/components/AnonymousAuth";
+import { Figtree, Geist, Geist_Mono } from "next/font/google";
+import { AnonymousAuth } from "@/features/users/components/AnonymousAuth";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", figtree.variable)}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased w-full h-screen flex items-center justify-center`}
       >

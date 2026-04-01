@@ -91,6 +91,7 @@ export const ensurePlayerRoundRow = async (
 
   return {
     wpm: row?.wpm,
+    user_id: userId,
     accuracy: row?.accuracy ?? null,
     live_progress: row?.live_progress ?? null,
     round: row?.round ?? null,
@@ -105,9 +106,18 @@ export const updatePlayerLiveStats = async (
   accuracy: number,
   liveProgress: string,
 ): Promise<void> => {
+  const safeWpm = Number.isFinite(wpm) ? Math.max(0, Math.round(wpm)) : 0;
+  const safeAccuracy = Number.isFinite(accuracy)
+    ? Math.min(100, Math.max(0, Math.round(accuracy)))
+    : 0;
+
   await supabase
     .from("player_stats")
-    .update({ wpm, accuracy, live_progress: liveProgress })
+    .update({
+      wpm: safeWpm,
+      accuracy: safeAccuracy,
+      live_progress: liveProgress,
+    })
     .eq("user_id", userId)
     .eq("race_id", raceId)
     .eq("round", round);

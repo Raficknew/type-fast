@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { PlayerName } from "@/components/PlayerName";
 import { StartGameButton } from "@/components/StartGameButton";
-import { TypeTest } from "@/components/TypeTest";
+import { PlayerName } from "@/features/player/components/PlayerName";
 import { createRace, getRace } from "@/features/race/actions/race";
+import { TypeTest } from "@/features/race/components/TypeTest";
 import { MAX_ROUNDS } from "@/gameSettings";
 
 export default async function TypeFastGamePage() {

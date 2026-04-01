@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { supabaseClient as supabase } from "@/lib/db";
 
 export function StartGameButton({
@@ -38,13 +39,8 @@ export function StartGameButton({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={isLoading}
-      className="bg-blue-400 px-10 py-5 rounded-sm text-white text-2xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-    >
+    <Button type="button" onClick={handleClick} disabled={isLoading} size="lg">
       {isLoading ? "Starting..." : "Start Game"}
-    </button>
+    </Button>
   );
 }
