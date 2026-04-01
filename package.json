@@ -10,7 +10,7 @@
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "format": "biome format --write",
-    "doctor": "npx -y react-doctor@latest . --no-ami",
+    "doctor": "npx -y react-doctor@latest . --offline --no-lint",
     "prepare": "husky"
   },
   "dependencies": {

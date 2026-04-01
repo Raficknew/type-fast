@@ -139,7 +139,7 @@ describe("getUserName", () => {
   it("returns display_name from user_metadata when present", () => {
     const user = {
       ...baseUser,
-      user_metadata: { display_name: "Alice" },
+      user_metadata: { name: "Alice" },
     } as User;
     expect(getUserName(user)).toBe("Alice");
   });
