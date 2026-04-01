@@ -44,6 +44,13 @@ export function TypeTest({
   });
   const userRef = useRef<User | null>(null);
   const insertedRoundsRef = useRef<Set<number>>(new Set());
+  const roundsAdvancingRef = useRef<Set<number>>(new Set());
+  const lastLiveUpdateRef = useRef<{
+    round: number;
+    wpm: number;
+    accuracy: number;
+    liveProgress: string;
+  } | null>(null);
   const gameRef = useRef(game);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -116,6 +123,30 @@ export function TypeTest({
     gameRef.current = game;
   });
 
+  const tryAdvanceRound = useCallback(
+    async (roundToAdvance: number) => {
+      if (roundsAdvancingRef.current.has(roundToAdvance)) {
+        return;
+      }
+
+      roundsAdvancingRef.current.add(roundToAdvance);
+
+      try {
+        if (roundToAdvance + 1 >= MAX_ROUNDS) {
+          await finalizeRace(raceId);
+          return;
+        }
+
+        await restartRace(raceId, roundToAdvance);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        roundsAdvancingRef.current.delete(roundToAdvance);
+      }
+    },
+    [raceId],
+  );
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: game.round is used as a trigger to re-focus on each new round
   useEffect(() => {
     inputRef.current?.focus();
@@ -163,15 +194,39 @@ export function TypeTest({
         mistakes: currentGame.mistakes,
       });
 
+      const liveProgress =
+        words[currentGame.currentWordIndex] === undefined
+          ? "FINISHED"
+          : words[currentGame.currentWordIndex];
+
+      const nextPayload = {
+        round: currentGame.round,
+        wpm,
+        accuracy,
+        liveProgress,
+      };
+
+      const lastPayload = lastLiveUpdateRef.current;
+      if (
+        lastPayload &&
+        lastPayload.round === nextPayload.round &&
+        lastPayload.wpm === nextPayload.wpm &&
+        lastPayload.accuracy === nextPayload.accuracy &&
+        lastPayload.liveProgress === nextPayload.liveProgress
+      ) {
+        return;
+      }
+
       currentGame.wpm = wpm;
+      lastLiveUpdateRef.current = nextPayload;
 
       await updatePlayerLiveStats(
         raceId,
         user.id,
-        currentGame.round,
-        currentGame.wpm,
-        accuracy,
-        words[currentGame.currentWordIndex],
+        nextPayload.round,
+        nextPayload.wpm,
+        nextPayload.accuracy,
+        nextPayload.liveProgress,
       );
     }, 2000);
 
@@ -223,6 +278,8 @@ export function TypeTest({
             if (userRef.current) {
               ensureRoundRow(userRef.current, newRound);
             }
+
+            lastLiveUpdateRef.current = null;
           }
         },
       )
@@ -232,6 +289,40 @@ export function TypeTest({
       supabase.removeChannel(channel);
     };
   }, [raceId, router, ensureRoundRow]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`public:player_stats:${raceId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "player_stats",
+          filter: `race_id=eq.${raceId}`,
+        },
+        (payload) => {
+          const updatedPlayer = payload.new as {
+            round?: number;
+            live_progress?: string;
+          };
+
+          if (
+            updatedPlayer.round !== gameRef.current.round ||
+            updatedPlayer.live_progress !== "FINISHED"
+          ) {
+            return;
+          }
+
+          void tryAdvanceRound(gameRef.current.round);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [raceId, tryAdvanceRound]);
 
   useEffect(() => {
     if (
@@ -248,51 +339,6 @@ export function TypeTest({
     }
   }, [game.hasRoundEnded, game.userHasFinished, game.correctWordsCount]);
 
-  useEffect(() => {
-    if (!game.hasRoundEnded) return;
-
-    let isCancelled = false;
-    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
-
-    const tryAdvanceRound = async () => {
-      if (isCancelled) return;
-
-      if (game.round + 1 >= MAX_ROUNDS) {
-        await finalizeRace(raceId);
-        router.push(`/results/${raceId}`);
-        return;
-      }
-
-      try {
-        await restartRace(raceId, game.round);
-      } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-
-        if (message.includes("Restart conditions not met") && !isCancelled) {
-          retryTimeout = setTimeout(() => {
-            tryAdvanceRound();
-          }, 500);
-          return;
-        }
-
-        if (message.includes("Race state is out of date")) {
-          return;
-        }
-        console.error(error);
-      }
-    };
-
-    tryAdvanceRound();
-
-    return () => {
-      isCancelled = true;
-      if (retryTimeout) {
-        clearTimeout(retryTimeout);
-      }
-    };
-  }, [game.hasRoundEnded, game.round, raceId, router]);
-
   const handleWordCheck = (text: string) => {
     const isCorrect = text.trim() === wordsInSentence[game.currentWordIndex];
     const isLastWord = game.currentWordIndex === wordsInSentence.length - 1;
@@ -307,13 +353,21 @@ export function TypeTest({
         hasRoundEnded: isLastWord ? true : prev.hasRoundEnded,
       }));
       if (isLastWord && userRef.current) {
+        const finishedPayload = {
+          round: game.round,
+          wpm: game.wpm,
+          accuracy,
+          liveProgress: "FINISHED",
+        };
+        lastLiveUpdateRef.current = finishedPayload;
+
         updatePlayerLiveStats(
           raceId,
           userRef.current.id,
-          game.round,
-          game.wpm,
-          accuracy,
-          "FINISHED",
+          finishedPayload.round,
+          finishedPayload.wpm,
+          finishedPayload.accuracy,
+          finishedPayload.liveProgress,
         ).catch(console.error);
       }
     } else {
@@ -361,8 +415,10 @@ export function TypeTest({
       : game.currentText;
 
   const handleRoundEnd = useCallback(() => {
+    const roundToAdvance = gameRef.current.round;
     setGame((prev) => ({ ...prev, counter: 0, hasRoundEnded: true }));
-  }, []);
+    void tryAdvanceRound(roundToAdvance);
+  }, [tryAdvanceRound]);
 
   const handleTimerTick = useCallback((timeLeft: number) => {
     setGame((prev) => ({ ...prev, counter: timeLeft }));

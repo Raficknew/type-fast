@@ -59,7 +59,7 @@ export const deleteRace = async (raceId: string) => {
 
 export const restartRace = async (raceId: string, currentRound: number) => {
   if (currentRound >= MAX_ROUNDS) {
-    throw new Error("Race has already ended");
+    return { status: "race_ended" as const };
   }
 
   const { data: race, error: raceError } = await supabase
@@ -70,7 +70,7 @@ export const restartRace = async (raceId: string, currentRound: number) => {
     .single();
 
   if (raceError || !race) {
-    throw new Error("Race state is out of date");
+    return { status: "out_of_date" as const };
   }
 
   const { data: players, error: playersError } = await supabase
@@ -89,13 +89,13 @@ export const restartRace = async (raceId: string, currentRound: number) => {
     players.every((player) => player.live_progress === "FINISHED");
 
   if (!roundExpired && !allPlayersFinished) {
-    throw new Error("Restart conditions not met");
+    return { status: "not_ready" as const };
   }
 
   const newSentence = getRandomSentence();
   const newRoundEndTime = getRoundEndTime();
 
-  await supabase
+  const { data: updatedRace, error: updateError } = await supabase
     .from("race")
     .update({
       sentence: newSentence,
@@ -103,7 +103,19 @@ export const restartRace = async (raceId: string, currentRound: number) => {
       round: currentRound + 1,
     })
     .eq("id", raceId)
-    .eq("round", currentRound);
+    .eq("round", currentRound)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  if (!updatedRace) {
+    return { status: "out_of_date" as const };
+  }
+
+  return { status: "advanced" as const };
 };
 
 export const finalizeRace = async (raceId: string) => {
