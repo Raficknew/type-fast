@@ -58,6 +58,15 @@ export function TypeTest({
   const wordsInSentence = game.sentence.split(" ");
   const charCounter = game.sentence.length;
   const accuracy = calculateAccuracy({ charCounter, mistakes: game.mistakes });
+  const calculateLiveWpm = useCallback(
+    (correctWordsCount: number, counter: number) => {
+      const clampedCounter = Math.min(ROUND_TIME, Math.max(0, counter));
+      const elapsedSeconds = Math.max(1, ROUND_TIME - clampedCounter);
+
+      return Math.round((correctWordsCount / elapsedSeconds) * 60);
+    },
+    [],
+  );
 
   const ensureRoundRow = useCallback(
     async (user: User, targetRound: number) => {
@@ -95,7 +104,7 @@ export function TypeTest({
 
             return {
               ...prev,
-              wpm: existingStats.wpm,
+              wpm: existingStats.wpm ?? 0,
               accuracy: existingStats.accuracy,
               correctWordsCount: currentWordIndex,
               currentWordIndex,
@@ -135,6 +144,27 @@ export function TypeTest({
         if (roundToAdvance + 1 >= MAX_ROUNDS) {
           await finalizeRace(raceId);
           return;
+        }
+        for (let attempt = 0; attempt < 8; attempt++) {
+          const result = await restartRace(raceId, roundToAdvance);
+
+          if (
+            result.status === "advanced" ||
+            result.status === "out_of_date" ||
+            result.status === "race_ended"
+          ) {
+            return;
+          }
+
+          if (result.status !== "not_ready") {
+            return;
+          }
+
+          if (gameRef.current.round !== roundToAdvance) {
+            return;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 400));
         }
 
         await restartRace(raceId, roundToAdvance);
@@ -185,9 +215,9 @@ export function TypeTest({
 
       const words = currentGame.sentence.split(" ");
       const sentenceLength = currentGame.sentence.length;
-      const wpm = Math.round(
-        (currentGame.correctWordsCount / (ROUND_TIME - currentGame.counter)) *
-          60,
+      const wpm = calculateLiveWpm(
+        currentGame.correctWordsCount,
+        currentGame.counter,
       );
       const accuracy = calculateAccuracy({
         charCounter: sentenceLength,
@@ -231,7 +261,7 @@ export function TypeTest({
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [raceId]);
+  }, [raceId, calculateLiveWpm]);
 
   useEffect(() => {
     const channel = supabase
@@ -314,7 +344,7 @@ export function TypeTest({
             return;
           }
 
-          void tryAdvanceRound(gameRef.current.round);
+          tryAdvanceRound(gameRef.current.round);
         },
       )
       .subscribe();
@@ -332,30 +362,37 @@ export function TypeTest({
     ) {
       setGame((prev) => ({
         ...prev,
-        wpm: Math.round(
-          (prev.correctWordsCount / (ROUND_TIME - prev.counter)) * 60,
-        ),
+        wpm: calculateLiveWpm(prev.correctWordsCount, prev.counter),
       }));
     }
-  }, [game.hasRoundEnded, game.userHasFinished, game.correctWordsCount]);
+  }, [
+    game.hasRoundEnded,
+    game.userHasFinished,
+    game.correctWordsCount,
+    calculateLiveWpm,
+  ]);
 
   const handleWordCheck = (text: string) => {
     const isCorrect = text.trim() === wordsInSentence[game.currentWordIndex];
     const isLastWord = game.currentWordIndex === wordsInSentence.length - 1;
 
     if (isCorrect) {
+      const nextCorrectWordsCount = game.correctWordsCount + 1;
+      const nextWpm = calculateLiveWpm(nextCorrectWordsCount, game.counter);
+
       setGame((prev) => ({
         ...prev,
-        correctWordsCount: prev.correctWordsCount + 1,
+        correctWordsCount: nextCorrectWordsCount,
         currentWordIndex: prev.currentWordIndex + 1,
         currentText: "",
+        wpm: nextWpm,
         userHasFinished: isLastWord ? true : prev.userHasFinished,
         hasRoundEnded: isLastWord ? true : prev.hasRoundEnded,
       }));
       if (isLastWord && userRef.current) {
         const finishedPayload = {
           round: game.round,
-          wpm: game.wpm,
+          wpm: nextWpm,
           accuracy,
           liveProgress: "FINISHED",
         };
@@ -417,7 +454,7 @@ export function TypeTest({
   const handleRoundEnd = useCallback(() => {
     const roundToAdvance = gameRef.current.round;
     setGame((prev) => ({ ...prev, counter: 0, hasRoundEnded: true }));
-    void tryAdvanceRound(roundToAdvance);
+    tryAdvanceRound(roundToAdvance);
   }, [tryAdvanceRound]);
 
   const handleTimerTick = useCallback((timeLeft: number) => {

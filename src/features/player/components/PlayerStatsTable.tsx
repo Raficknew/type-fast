@@ -23,10 +23,12 @@ export function PlayerStatsTable({
   const [players, setPlayers] = useState<PlayerStat[]>([]);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const sortedPlayers = players.sort((a, b) => b.wpm - a.wpm);
+
   const fetchPlayers = useCallback(async () => {
     try {
       const data = await getPlayerStats(raceId, round);
-      setPlayers(data.sort((a, b) => (b.wpm ?? 0) - (a.wpm ?? 0)));
+      setPlayers(data);
     } catch (error) {
       console.error("Failed to load player stats", { raceId, round }, error);
     }
@@ -39,12 +41,12 @@ export function PlayerStatsTable({
 
     fetchTimeoutRef.current = setTimeout(() => {
       fetchTimeoutRef.current = null;
-      void fetchPlayers();
+      fetchPlayers();
     }, 200);
   }, [fetchPlayers]);
 
   useEffect(() => {
-    void fetchPlayers();
+    fetchPlayers();
 
     const channel = supabase
       .channel(`public:player_stats:${raceId}:${round}`)
@@ -89,7 +91,7 @@ export function PlayerStatsTable({
         </tr>
       </thead>
       <tbody>
-        {players.map((player) => {
+        {sortedPlayers.map((player) => {
           const isCurrentUser = player.user_id === userId;
           return (
             <tr key={player.id} className="border-b last:border-0">
