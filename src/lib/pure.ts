@@ -7,8 +7,15 @@ export const getRoundEndTime = () => {
   return new Date(Date.now() + ROUND_TIME * 1000).toISOString();
 };
 
-export const getTimeLeft = (endTime: string) => {
-  return Math.floor((new Date(endTime).getTime() - Date.now()) / 1000);
+export const getTimeLeft = (endTime: string, nowMs = Date.now()) => {
+  return Math.floor((new Date(endTime).getTime() - nowMs) / 1000);
+};
+
+export const getServerClockOffset = (
+  serverNow: string,
+  clientNowMs = Date.now(),
+) => {
+  return new Date(serverNow).getTime() - clientNowMs;
 };
 
 export const getRandomSentence = () => {

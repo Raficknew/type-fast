@@ -5,6 +5,7 @@ import {
   calculateAccuracy,
   getRandomSentence,
   getRoundEndTime,
+  getServerClockOffset,
   getTimeLeft,
   getUserName,
 } from "@/lib/pure";
@@ -71,6 +72,25 @@ describe("getTimeLeft", () => {
     vi.setSystemTime(now);
     const endTime = new Date(now.getTime() + 10_500).toISOString();
     expect(getTimeLeft(endTime)).toBe(10);
+  });
+
+  it("supports a server-referenced current time", () => {
+    const clientNow = new Date("2026-01-01T00:00:00.000Z");
+    const serverNow = new Date("2026-01-01T00:00:30.000Z");
+    vi.setSystemTime(clientNow);
+
+    const endTime = new Date("2026-01-01T00:01:00.000Z").toISOString();
+    expect(getTimeLeft(endTime, serverNow.getTime())).toBe(30);
+  });
+});
+
+describe("getServerClockOffset", () => {
+  it("returns how far server time is ahead of client time", () => {
+    const clientNow = new Date("2026-01-01T00:00:00.000Z");
+    vi.setSystemTime(clientNow);
+
+    const serverNow = new Date("2026-01-01T00:00:30.000Z").toISOString();
+    expect(getServerClockOffset(serverNow)).toBe(30_000);
   });
 });
 

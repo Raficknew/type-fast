@@ -8,7 +8,7 @@ import {
   updatePlayerLiveStats,
 } from "@/features/player/actions/playerStats";
 import { PlayerStatsTable } from "@/features/player/components/PlayerStatsTable";
-import { finalizeRace, restartRace } from "@/features/race/actions/race";
+import { restartRace } from "@/features/race/actions/race";
 import { MAX_ROUNDS, ROUND_TIME } from "@/gameSettings";
 import { supabaseClient as supabase } from "@/lib/db";
 import { calculateAccuracy, getUserName } from "@/lib/pure";
@@ -21,11 +21,13 @@ export function TypeTest({
   round,
   raceId,
   endTime,
+  serverNow,
 }: {
   sentence: string;
   round: number;
   raceId: string;
   endTime: string;
+  serverNow: string;
 }) {
   const [game, setGame] = useState<GameState>({
     sentence,
@@ -141,10 +143,6 @@ export function TypeTest({
       roundsAdvancingRef.current.add(roundToAdvance);
 
       try {
-        if (roundToAdvance + 1 >= MAX_ROUNDS) {
-          await finalizeRace(raceId);
-          return;
-        }
         for (let attempt = 0; attempt < 8; attempt++) {
           const result = await restartRace(raceId, roundToAdvance);
 
@@ -467,6 +465,7 @@ export function TypeTest({
       <RaceTimer
         title="Next Round in"
         endTime={game.endTime}
+        serverNow={serverNow}
         action={handleRoundEnd}
         onTick={handleTimerTick}
       />
