@@ -11,6 +11,7 @@ export default async function ResultsPage({
   params: Promise<{ raceId: string }>;
 }) {
   const { raceId } = await params;
+  const serverNow = new Date().toISOString();
   const [playerStats, race] = await Promise.all([
     getFinalPlayersStats(raceId),
     getRace(raceId),
@@ -28,6 +29,7 @@ export default async function ResultsPage({
       <RaceTimer
         title="Ends in"
         endTime={race.end_time}
+        serverNow={serverNow}
         action={deleteRace.bind(null, raceId)}
       />
       {raceResults.map((player, index) => (

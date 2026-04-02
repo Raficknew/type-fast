@@ -7,6 +7,7 @@ import { MAX_ROUNDS } from "@/gameSettings";
 
 export default async function TypeFastGamePage() {
   const race = await getRace().catch(() => null);
+  const serverNow = new Date().toISOString();
 
   if (!race) {
     return (
@@ -23,12 +24,13 @@ export default async function TypeFastGamePage() {
 
   return (
     <div className="flex flex-col items-center gap-4 w-full">
-      <PlayerName hasGameStarted={true} />
+      <PlayerName hasGameStarted={true} raceId={race.id} round={race.round} />
       <TypeTest
         sentence={race.sentence}
         round={race.round}
         raceId={race.id}
         endTime={race.end_time}
+        serverNow={serverNow}
       />
     </div>
   );

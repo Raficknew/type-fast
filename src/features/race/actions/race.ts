@@ -118,13 +118,6 @@ export const restartRace = async (raceId: string, currentRound: number) => {
   return { status: "advanced" as const };
 };
 
-export const finalizeRace = async (raceId: string) => {
-  await supabase
-    .from("race")
-    .update({ round: MAX_ROUNDS, end_time: getRoundEndTime() })
-    .eq("id", raceId);
-};
-
 export const getRace = async (raceId?: string) => {
   let query = supabase.from("race").select();
 

@@ -1,24 +1,31 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { getTimeLeft } from "@/lib/pure";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { getServerClockOffset, getTimeLeft } from "@/lib/pure";
 
 export function RaceTimer({
   title,
   endTime,
+  serverNow,
   action,
   onTick,
 }: {
   title: string;
   endTime: string;
+  serverNow: string;
   action: () => void;
   onTick?: (timeLeft: number) => void;
 }) {
   const [counter, setCounter] = useState(0);
   const startedAtRef = useRef<number>(0);
   const initialTimeLeftRef = useRef<number>(0);
+  const serverOffsetMs = useMemo(
+    () => getServerClockOffset(serverNow),
+    [serverNow],
+  );
 
   useEffect(() => {
-    const initialTimeLeft = getTimeLeft(endTime);
+    const nowOnServerClock = Date.now() + serverOffsetMs;
+    const initialTimeLeft = getTimeLeft(endTime, nowOnServerClock);
     initialTimeLeftRef.current = initialTimeLeft;
     startedAtRef.current = performance.now();
 
@@ -46,7 +53,7 @@ export function RaceTimer({
       clearInterval(timer);
       if (actionTimeout) clearTimeout(actionTimeout);
     };
-  }, [endTime, action, onTick]);
+  }, [endTime, serverOffsetMs, action, onTick]);
 
   return (
     <div>
