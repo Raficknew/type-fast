@@ -42,9 +42,41 @@ export const getUserName = (user: User): string => {
   );
 };
 
+export const getRaceScopedDisplayNames = (
+  players: Array<{ user_id: string; name: string }>,
+) => {
+  const firstNameByUserId = new Map<string, string>();
+  for (const player of players) {
+    if (!firstNameByUserId.has(player.user_id)) {
+      firstNameByUserId.set(player.user_id, player.name);
+    }
+  }
+
+  const userIdsByName = new Map<string, string[]>();
+  for (const [userId, name] of firstNameByUserId.entries()) {
+    const userIds = userIdsByName.get(name) ?? [];
+    userIds.push(userId);
+    userIdsByName.set(name, userIds);
+  }
+
+  const scopedNameByUserId = new Map<string, string>();
+
+  for (const [name, userIds] of userIdsByName.entries()) {
+    const sortedUserIds = [...userIds].sort((a, b) => a.localeCompare(b));
+
+    sortedUserIds.forEach((userId, index) => {
+      const scopedName = index === 0 ? name : `${name} #${index + 1}`;
+      scopedNameByUserId.set(userId, scopedName);
+    });
+  }
+
+  return scopedNameByUserId;
+};
+
 export const summarizeResultsForPlayers = (playerStats: PlayerStat[]) => {
   const playerMap = new Map<string, PlayerStat[]>();
   const summarizedResults: PlayerResult[] = [];
+  const raceScopedNameByUserId = getRaceScopedDisplayNames(playerStats);
 
   for (const playerStat of playerStats) {
     const existingStats = playerMap.get(playerStat.user_id);
@@ -57,7 +89,7 @@ export const summarizeResultsForPlayers = (playerStats: PlayerStat[]) => {
   }
 
   for (const [userId, stats] of playerMap.entries()) {
-    const name = stats[0].name;
+    const name = raceScopedNameByUserId.get(userId) ?? stats[0].name;
     const averageAccuracy =
       stats.reduce((sum, stat) => sum + stat.accuracy, 0) / stats.length;
     const averageWpm =

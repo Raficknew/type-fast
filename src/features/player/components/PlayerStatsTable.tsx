@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPlayerStats } from "@/features/player/actions/playerStats";
 import { supabaseClient as supabase } from "@/lib/db";
+import { getRaceScopedDisplayNames } from "@/lib/pure";
 import type { PlayerStat } from "@/types/types";
 
 export function PlayerStatsTable({
@@ -23,7 +24,14 @@ export function PlayerStatsTable({
   const [players, setPlayers] = useState<PlayerStat[]>([]);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sortedPlayers = players.sort((a, b) => b.wpm - a.wpm);
+  const sortedPlayers = useMemo(
+    () => [...players].sort((a, b) => b.wpm - a.wpm),
+    [players],
+  );
+  const raceScopedNameByUserId = useMemo(
+    () => getRaceScopedDisplayNames(players),
+    [players],
+  );
 
   const fetchPlayers = useCallback(async () => {
     try {
@@ -100,7 +108,9 @@ export function PlayerStatsTable({
                   ? (live_progress ?? "|")
                   : (player.live_progress ?? "-")}
               </td>
-              <td className="py-2 pr-4">{player.name}</td>
+              <td className="py-2 pr-4">
+                {raceScopedNameByUserId.get(player.user_id) ?? player.name}
+              </td>
               <td className="py-2 pr-4">
                 {isCurrentUser
                   ? Number.isFinite(wpm)

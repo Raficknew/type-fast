@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ROUND_TIME } from "@/gameSettings";
 import {
   calculateAccuracy,
+  getRaceScopedDisplayNames,
   getRandomSentence,
   getRoundEndTime,
   getServerClockOffset,
   getTimeLeft,
   getUserName,
+  summarizeResultsForPlayers,
 } from "@/lib/pure";
 import { sentences } from "@/lib/sentences";
 
@@ -183,5 +185,100 @@ describe("getUserName", () => {
   it("uses exactly the first 6 characters of the id for the fallback", () => {
     const user = { ...baseUser, id: "xyz999longid", user_metadata: {} } as User;
     expect(getUserName(user)).toBe("Player #XYZ999");
+  });
+});
+
+describe("getRaceScopedDisplayNames", () => {
+  it("keeps unique names unchanged", () => {
+    const result = getRaceScopedDisplayNames([
+      { user_id: "u1", name: "Alice" },
+      { user_id: "u2", name: "Bob" },
+    ]);
+
+    expect(result.get("u1")).toBe("Alice");
+    expect(result.get("u2")).toBe("Bob");
+  });
+
+  it("adds #2 for the second player with same name", () => {
+    const result = getRaceScopedDisplayNames([
+      { user_id: "u1", name: "Player" },
+      { user_id: "u2", name: "Player" },
+    ]);
+
+    expect(result.get("u1")).toBe("Player");
+    expect(result.get("u2")).toBe("Player #2");
+  });
+
+  it("is deterministic and uses user_id order for duplicates", () => {
+    const result = getRaceScopedDisplayNames([
+      { user_id: "user-b", name: "Same" },
+      { user_id: "user-a", name: "Same" },
+      { user_id: "user-c", name: "Same" },
+    ]);
+
+    expect(result.get("user-a")).toBe("Same");
+    expect(result.get("user-b")).toBe("Same #2");
+    expect(result.get("user-c")).toBe("Same #3");
+  });
+
+  it("ignores duplicate rows for the same user", () => {
+    const result = getRaceScopedDisplayNames([
+      { user_id: "u1", name: "Player" },
+      { user_id: "u1", name: "Player" },
+      { user_id: "u2", name: "Player" },
+    ]);
+
+    expect(result.get("u1")).toBe("Player");
+    expect(result.get("u2")).toBe("Player #2");
+  });
+});
+
+describe("summarizeResultsForPlayers", () => {
+  it("disambiguates duplicate names in final results", () => {
+    const results = summarizeResultsForPlayers([
+      {
+        id: "r1",
+        user_id: "user-a",
+        name: "Player",
+        round: 1,
+        wpm: 50,
+        accuracy: 90,
+        live_progress: "FINISHED",
+      },
+      {
+        id: "r2",
+        user_id: "user-a",
+        name: "Player",
+        round: 2,
+        wpm: 60,
+        accuracy: 95,
+        live_progress: "FINISHED",
+      },
+      {
+        id: "r3",
+        user_id: "user-b",
+        name: "Player",
+        round: 1,
+        wpm: 55,
+        accuracy: 91,
+        live_progress: "FINISHED",
+      },
+      {
+        id: "r4",
+        user_id: "user-b",
+        name: "Player",
+        round: 2,
+        wpm: 57,
+        accuracy: 94,
+        live_progress: "FINISHED",
+      },
+    ]);
+
+    const resultByUserId = new Map(
+      results.map((result) => [result.userId, result]),
+    );
+
+    expect(resultByUserId.get("user-a")?.name).toBe("Player");
+    expect(resultByUserId.get("user-b")?.name).toBe("Player #2");
   });
 });
