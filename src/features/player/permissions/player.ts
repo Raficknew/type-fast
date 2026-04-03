@@ -7,15 +7,22 @@ type SupabaseErrorLike = {
   message: string;
 } | null;
 
-export const assertAuthenticatedUser = async (userId: string) => {
+export const assertAuthenticatedUser = async (
+  userId: string,
+  accessToken: string,
+) => {
   if (!userId) {
     throw new Error("Missing user id");
+  }
+
+  if (!accessToken) {
+    throw new Error("Unauthorized");
   }
 
   const {
     data: { user },
     error,
-  } = await supabaseServer.auth.getUser(userId);
+  } = await supabaseServer.auth.getUser(accessToken);
 
   if (error || !user) {
     throw new Error("Unauthorized");

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Figtree, Geist, Geist_Mono } from "next/font/google";
 import { AnonymousAuth } from "@/features/users/components/AnonymousAuth";
 import "./globals.css";
+import { ThemeProvider } from "next-themes";
 import { cn } from "@/lib/utils";
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
@@ -27,12 +28,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", figtree.variable)}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={cn("font-sans", figtree.variable)}
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased w-full h-screen flex items-center justify-center`}
       >
-        <AnonymousAuth />
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <AnonymousAuth />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
