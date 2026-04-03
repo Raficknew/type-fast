@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { MAX_ROUNDS } from "@/gameSettings";
 import { supabaseServer as supabase } from "@/lib/db";
+import { assertNoSupabaseError } from "@/lib/permissions";
 import { getRandomSentence, getRoundEndTime } from "@/lib/pure";
+import { assertRaceEnded } from "../permissions/race";
 
 export const createRace = async () => {
   const { data: existingRaces } = await supabase
@@ -25,9 +27,7 @@ export const createRace = async () => {
     end_time: newRoundEndTime,
   });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  assertNoSupabaseError(error);
 
   revalidatePath("/");
 };
@@ -44,15 +44,10 @@ export const deleteRace = async (raceId: string) => {
     return;
   }
 
-  if (data.round < MAX_ROUNDS - 1) {
-    throw new Error("Race has not ended yet");
-  }
+  assertRaceEnded(data, MAX_ROUNDS);
 
   const { error } = await supabase.from("race").delete().eq("id", raceId);
-
-  if (error) {
-    throw new Error("Failed to delete race");
-  }
+  assertNoSupabaseError(error);
 
   revalidatePath("/");
 };
@@ -79,14 +74,14 @@ export const restartRace = async (raceId: string, currentRound: number) => {
     .eq("race_id", raceId)
     .eq("round", currentRound);
 
-  if (playersError) {
-    throw new Error(playersError.message);
-  }
+  assertNoSupabaseError(playersError);
+
+  const racePlayers = players ?? [];
 
   const roundExpired = new Date(race.end_time).getTime() <= Date.now();
   const allPlayersFinished =
-    (players?.length ?? 0) > 0 &&
-    players.every((player) => player.live_progress === "FINISHED");
+    racePlayers.length > 0 &&
+    racePlayers.every((player) => player.live_progress === "FINISHED");
 
   if (!roundExpired && !allPlayersFinished) {
     return { status: "not_ready" as const };
@@ -107,9 +102,7 @@ export const restartRace = async (raceId: string, currentRound: number) => {
     .select("id")
     .maybeSingle();
 
-  if (updateError) {
-    throw new Error(updateError.message);
-  }
+  assertNoSupabaseError(updateError);
 
   if (!updatedRace) {
     return { status: "out_of_date" as const };
