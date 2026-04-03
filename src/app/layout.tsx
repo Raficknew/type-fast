@@ -3,6 +3,7 @@ import { Figtree, Geist, Geist_Mono } from "next/font/google";
 import { AnonymousAuth } from "@/features/users/components/AnonymousAuth";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { cn } from "@/lib/utils";
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
@@ -36,7 +37,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased w-full h-screen flex items-center justify-center`}
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="system">
+          <ThemeSwitcher />
           <AnonymousAuth />
           {children}
         </ThemeProvider>
