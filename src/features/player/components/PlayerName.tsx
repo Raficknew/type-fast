@@ -114,7 +114,10 @@ export function PlayerName({
   return (
     <div className="flex relative items-center gap-2">
       <p>
-        Playing as <span className="font-semibold">{displayName}</span>
+        Playing as{" "}
+        <span className="font-semibold text-sidebar-primary">
+          {displayName}
+        </span>
       </p>
       {!hasGameStarted && (
         <UserNameEditDialog name={isGenerated ? undefined : displayName} />

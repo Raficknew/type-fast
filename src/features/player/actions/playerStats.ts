@@ -1,7 +1,12 @@
 "use server";
 
 import { supabaseServer as supabase } from "@/lib/db";
+import { assertNoSupabaseError } from "@/lib/permissions";
 import type { PlayerStat } from "@/types/types";
+import {
+  assertAuthenticatedUser,
+  assertMissingConflictConstraintError,
+} from "../permissions/player";
 
 export const getPlayerStats = async (
   raceId: string,
@@ -14,9 +19,7 @@ export const getPlayerStats = async (
     .eq("round", round)
     .order("name");
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  assertNoSupabaseError(error);
 
   return data ?? [];
 };
@@ -24,9 +27,12 @@ export const getPlayerStats = async (
 export const ensurePlayerRoundRow = async (
   raceId: string,
   userId: string,
+  accessToken: string,
   displayName: string,
   round: number,
 ): Promise<Omit<PlayerStat, "id" | "name"> | null> => {
+  await assertAuthenticatedUser(userId, accessToken);
+
   const { error: upsertError } = await supabase.from("player_stats").upsert(
     {
       name: displayName,
@@ -41,13 +47,7 @@ export const ensurePlayerRoundRow = async (
   );
 
   if (upsertError) {
-    const missingConflictConstraint = upsertError.message.includes(
-      "no unique or exclusion constraint matching the ON CONFLICT specification",
-    );
-
-    if (!missingConflictConstraint) {
-      throw new Error(upsertError.message);
-    }
+    assertMissingConflictConstraintError(upsertError);
 
     const { data: existingRow, error: existingRowError } = await supabase
       .from("player_stats")
@@ -57,9 +57,7 @@ export const ensurePlayerRoundRow = async (
       .eq("round", round)
       .maybeSingle();
 
-    if (existingRowError) {
-      throw new Error(existingRowError.message);
-    }
+    assertNoSupabaseError(existingRowError);
 
     if (!existingRow) {
       const { error: insertError } = await supabase
@@ -72,7 +70,7 @@ export const ensurePlayerRoundRow = async (
         });
 
       if (insertError) {
-        throw new Error(insertError.message);
+        assertNoSupabaseError(insertError);
       }
     }
   }
@@ -85,9 +83,7 @@ export const ensurePlayerRoundRow = async (
     .eq("round", round)
     .maybeSingle();
 
-  if (fetchError) {
-    throw new Error(fetchError.message);
-  }
+  assertNoSupabaseError(fetchError);
 
   return {
     wpm: row?.wpm,
@@ -101,11 +97,14 @@ export const ensurePlayerRoundRow = async (
 export const updatePlayerLiveStats = async (
   raceId: string,
   userId: string,
+  accessToken: string,
   round: number,
   wpm: number,
   accuracy: number,
   liveProgress: string,
 ): Promise<void> => {
+  await assertAuthenticatedUser(userId, accessToken);
+
   const safeWpm = Number.isFinite(wpm) ? Math.max(0, Math.round(wpm)) : 0;
   const safeAccuracy = Number.isFinite(accuracy)
     ? Math.min(100, Math.max(0, Math.round(accuracy)))
@@ -134,9 +133,7 @@ export const getFinalPlayersStats = async (
     .order("accuracy", { ascending: false })
     .order("name");
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  assertNoSupabaseError(error);
 
   return data ?? [];
 };

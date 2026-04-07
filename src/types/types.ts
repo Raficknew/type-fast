@@ -30,5 +30,12 @@ export type PlayerResult = {
   averageWpm: number;
   averageAccuracy: number;
   roundsPlayed: number;
-  position?: number;
+};
+
+export type SupabaseErrorLike = {
+  message: string;
+} | null;
+
+export type RaceRoundLike = {
+  round: number;
 };

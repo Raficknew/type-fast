@@ -1,6 +1,14 @@
 "use client";
 
+import { Reorder, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getPlayerStats } from "@/features/player/actions/playerStats";
 import { supabaseClient as supabase } from "@/lib/db";
 import { getRaceScopedDisplayNames } from "@/lib/pure";
@@ -24,14 +32,25 @@ export function PlayerStatsTable({
   const [players, setPlayers] = useState<PlayerStat[]>([]);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sortedPlayers = useMemo(
-    () => [...players].sort((a, b) => b.wpm - a.wpm),
+  const sortedPlayerIds = useMemo(
+    () => [...players].sort((a, b) => b.wpm - a.wpm).map((player) => player.id),
+    [players],
+  );
+  const [orderedPlayerIds, setOrderedPlayerIds] =
+    useState<string[]>(sortedPlayerIds);
+  const shouldReduceMotion = useReducedMotion();
+  const playerById = useMemo(
+    () => new Map(players.map((player) => [player.id, player])),
     [players],
   );
   const raceScopedNameByUserId = useMemo(
     () => getRaceScopedDisplayNames(players),
     [players],
   );
+
+  useEffect(() => {
+    setOrderedPlayerIds(sortedPlayerIds);
+  }, [sortedPlayerIds]);
 
   const fetchPlayers = useCallback(async () => {
     try {
@@ -89,42 +108,65 @@ export function PlayerStatsTable({
   }, [raceId, round, fetchPlayers, scheduleFetch]);
 
   return (
-    <table className="w-full text-left border-collapse text-sm">
-      <thead>
-        <tr className="border-b">
-          <th className="py-2 pr-4">Live progress</th>
-          <th className="py-2 pr-4">Player name</th>
-          <th className="py-2 pr-4">Words per minute</th>
-          <th className="py-2">Accuracy</th>
-        </tr>
-      </thead>
-      <tbody>
-        {sortedPlayers.map((player) => {
+    <Table className="w-full text-left border-collapse text-sm">
+      <TableHeader className="p-0">
+        <TableRow>
+          <TableHead>Live progress</TableHead>
+          <TableHead>Player name</TableHead>
+          <TableHead>Words per minute</TableHead>
+          <TableHead>Accuracy</TableHead>
+        </TableRow>
+      </TableHeader>
+      <Reorder.Group
+        as="tbody"
+        axis="y"
+        values={orderedPlayerIds}
+        onReorder={setOrderedPlayerIds}
+        className="[&_tr:last-child]:border-0"
+      >
+        {orderedPlayerIds.map((playerId) => {
+          const player = playerById.get(playerId);
+          if (!player) {
+            return null;
+          }
+
           const isCurrentUser = player.user_id === userId;
           return (
-            <tr key={player.id} className="border-b last:border-0">
-              <td className="py-2 pr-4">
+            <Reorder.Item
+              key={player.id}
+              as="tr"
+              value={player.id}
+              dragListener={false}
+              layout={shouldReduceMotion ? undefined : "position"}
+              className="border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted"
+              transition={
+                shouldReduceMotion
+                  ? { duration: 0 }
+                  : { type: "spring", stiffness: 520, damping: 42 }
+              }
+            >
+              <TableCell>
                 {isCurrentUser
                   ? (live_progress ?? "|")
                   : (player.live_progress ?? "-")}
-              </td>
-              <td className="py-2 pr-4">
+              </TableCell>
+              <TableCell>
                 {raceScopedNameByUserId.get(player.user_id) ?? player.name}
-              </td>
-              <td className="py-2 pr-4">
+              </TableCell>
+              <TableCell>
                 {isCurrentUser
                   ? Number.isFinite(wpm)
                     ? wpm
                     : 0
                   : (player.wpm ?? 0)}
-              </td>
-              <td className="py-2">
+              </TableCell>
+              <TableCell>
                 {isCurrentUser ? (accuracy ?? 0) : (player.accuracy ?? 0)}%
-              </td>
-            </tr>
+              </TableCell>
+            </Reorder.Item>
           );
         })}
-      </tbody>
-    </table>
+      </Reorder.Group>
+    </Table>
   );
 }

@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import type { GameState } from "@/types/types";
 
 export function GameSentence({
@@ -28,7 +29,7 @@ export function GameSentence({
   }
 
   return (
-    <div className="w-full text-xl rounded select-none leading-relaxed tracking-wide cursor-text grow">
+    <div className="w-full text-xl text-pretty rounded select-none leading-relaxed tracking-wide cursor-text grow">
       {tokens.map((token) => (
         <span
           key={token.startIndex}
@@ -46,19 +47,22 @@ export function GameSentence({
             return (
               <span
                 key={idx}
-                className={[
+                className={cn(
                   "relative inline",
                   isTyped
                     ? isCorrect
-                      ? "text-green-400"
-                      : "text-red-400"
-                    : "text-gray-500",
-                  isWrongSpace ? "bg-red-400/50 rounded-sm" : "",
-                  isCursor ? "border-l-2" : "",
-                ]
-                  .join(" ")
-                  .trim()}
+                      ? "text-chart-1"
+                      : "text-destructive"
+                    : "text-muted-foreground",
+                  isWrongSpace ? "bg-destructive rounded-sm" : "",
+                )}
               >
+                {isCursor && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute left-0 top-[0.05em] h-[1.2em] w-0.5 rounded bg-primary"
+                  />
+                )}
                 {isTyped && !isCorrect ? typedSoFar[idx] : char}
               </span>
             );

@@ -3,6 +3,7 @@
 import type { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Progress } from "@/components/ui/progress";
 import {
   ensurePlayerRoundRow,
   updatePlayerLiveStats,
@@ -45,6 +46,7 @@ export function TypeTest({
     isWordWrong: false,
   });
   const userRef = useRef<User | null>(null);
+  const accessTokenRef = useRef<string | null>(null);
   const insertedRoundsRef = useRef<Set<number>>(new Set());
   const roundsAdvancingRef = useRef<Set<number>>(new Set());
   const lastLiveUpdateRef = useRef<{
@@ -71,7 +73,7 @@ export function TypeTest({
   );
 
   const ensureRoundRow = useCallback(
-    async (user: User, targetRound: number) => {
+    async (user: User, accessToken: string, targetRound: number) => {
       if (insertedRoundsRef.current.has(targetRound)) return;
       insertedRoundsRef.current.add(targetRound);
 
@@ -79,6 +81,7 @@ export function TypeTest({
         const existingStats = await ensurePlayerRoundRow(
           raceId,
           user.id,
+          accessToken,
           getUserName(user),
           targetRound,
         );
@@ -182,21 +185,40 @@ export function TypeTest({
 
   useEffect(() => {
     const initPlayer = async () => {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData.user;
-      if (!user) return;
-      userRef.current = user;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
+      const accessToken = session?.access_token;
 
-      await ensureRoundRow(user, gameRef.current.round);
+      if (!user || !accessToken) return;
+      userRef.current = user;
+      accessTokenRef.current = accessToken;
+
+      await ensureRoundRow(user, accessToken, gameRef.current.round);
     };
 
     initPlayer();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
-        initPlayer();
-      }
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_IN" && session?.user && session.access_token) {
+          userRef.current = session.user;
+          accessTokenRef.current = session.access_token;
+          ensureRoundRow(
+            session.user,
+            session.access_token,
+            gameRef.current.round,
+          );
+          return;
+        }
+
+        if (event === "SIGNED_OUT") {
+          userRef.current = null;
+          accessTokenRef.current = null;
+        }
+      },
+    );
 
     return () => {
       authListener.subscription.unsubscribe();
@@ -209,7 +231,8 @@ export function TypeTest({
       if (currentGame.userHasFinished || currentGame.hasRoundEnded) return;
 
       const user = userRef.current;
-      if (!user) return;
+      const accessToken = accessTokenRef.current;
+      if (!user || !accessToken) return;
 
       const words = currentGame.sentence.split(" ");
       const sentenceLength = currentGame.sentence.length;
@@ -251,6 +274,7 @@ export function TypeTest({
       await updatePlayerLiveStats(
         raceId,
         user.id,
+        accessToken,
         nextPayload.round,
         nextPayload.wpm,
         nextPayload.accuracy,
@@ -304,7 +328,10 @@ export function TypeTest({
             });
 
             if (userRef.current) {
-              ensureRoundRow(userRef.current, newRound);
+              const accessToken = accessTokenRef.current;
+              if (accessToken) {
+                ensureRoundRow(userRef.current, accessToken, newRound);
+              }
             }
 
             lastLiveUpdateRef.current = null;
@@ -388,6 +415,11 @@ export function TypeTest({
         hasRoundEnded: isLastWord ? true : prev.hasRoundEnded,
       }));
       if (isLastWord && userRef.current) {
+        const accessToken = accessTokenRef.current;
+        if (!accessToken) {
+          return;
+        }
+
         const finishedPayload = {
           round: game.round,
           wpm: nextWpm,
@@ -399,6 +431,7 @@ export function TypeTest({
         updatePlayerLiveStats(
           raceId,
           userRef.current.id,
+          accessToken,
           finishedPayload.round,
           finishedPayload.wpm,
           finishedPayload.accuracy,
@@ -449,6 +482,25 @@ export function TypeTest({
         game.currentText
       : game.currentText;
 
+  const completedWordsTextLength =
+    game.currentWordIndex > 0
+      ? wordsInSentence.slice(0, game.currentWordIndex).join(" ").length + 1
+      : 0;
+  const currentWord = wordsInSentence[game.currentWordIndex] ?? "";
+  let currentWordCorrectChars = 0;
+
+  for (let i = 0; i < game.currentText.length; i++) {
+    if (game.currentText[i] !== currentWord[i]) {
+      break;
+    }
+    currentWordCorrectChars += 1;
+  }
+
+  const correctCharsCount = Math.min(
+    charCounter,
+    completedWordsTextLength + currentWordCorrectChars,
+  );
+
   const handleRoundEnd = useCallback(() => {
     const roundToAdvance = gameRef.current.round;
     setGame((prev) => ({ ...prev, counter: 0, hasRoundEnded: true }));
@@ -459,16 +511,24 @@ export function TypeTest({
     setGame((prev) => ({ ...prev, counter: timeLeft }));
   }, []);
 
+  const progress =
+    charCounter === 0
+      ? 0
+      : Math.min(1, Math.max(correctCharsCount / charCounter, 0));
+
   return (
-    <div className="flex flex-col gap-2 p-4 max-w-150">
-      <div>Round: {game.round}</div>
-      <RaceTimer
-        title="Next Round in"
-        endTime={game.endTime}
-        serverNow={serverNow}
-        action={handleRoundEnd}
-        onTick={handleTimerTick}
-      />
+    <main className="flex flex-col gap-2 p-4 max-w-150">
+      <section className="flex gap-2 w-full justify-between items-center">
+        <h3 className="text-primary">round {game.round}</h3>
+        <RaceTimer
+          title="Next round in"
+          endTime={game.endTime}
+          serverNow={serverNow}
+          action={handleRoundEnd}
+          onTick={handleTimerTick}
+        />
+      </section>
+      <Progress value={progress * 100} className="w-full" />
       <GameSentence game={game} typedSoFar={typedSoFar} />
       <input
         ref={inputRef}
@@ -487,6 +547,6 @@ export function TypeTest({
         accuracy={accuracy}
         live_progress={wordsInSentence[game.currentWordIndex] ?? "FINISHED"}
       />
-    </div>
+    </main>
   );
 }
