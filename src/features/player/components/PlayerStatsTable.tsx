@@ -1,6 +1,6 @@
 "use client";
 
-import { Reorder } from "motion/react";
+import { Reorder, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Table,
@@ -38,6 +38,7 @@ export function PlayerStatsTable({
   );
   const [orderedPlayerIds, setOrderedPlayerIds] =
     useState<string[]>(sortedPlayerIds);
+  const shouldReduceMotion = useReducedMotion();
   const playerById = useMemo(
     () => new Map(players.map((player) => [player.id, player])),
     [players],
@@ -136,8 +137,13 @@ export function PlayerStatsTable({
               as="tr"
               value={player.id}
               dragListener={false}
+              layout={shouldReduceMotion ? undefined : "position"}
               className="border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted"
-              transition={{ type: "spring", stiffness: 520, damping: 42 }}
+              transition={
+                shouldReduceMotion
+                  ? { duration: 0 }
+                  : { type: "spring", stiffness: 520, damping: 42 }
+              }
             >
               <TableCell>
                 {isCurrentUser
