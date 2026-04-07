@@ -3,12 +3,22 @@
 import { Moon02Icon, Sun01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 
 export default function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
-  const currentTheme =
-    theme === "light" || theme === "system" ? "light" : "dark";
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  const currentTheme = resolvedTheme === "dark" ? "dark" : "light";
   const changeTheme = currentTheme === "light" ? "dark" : "light";
 
   return (

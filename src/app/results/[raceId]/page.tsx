@@ -1,8 +1,17 @@
 import { redirect } from "next/navigation";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getFinalPlayersStats } from "@/features/player/actions/playerStats";
 import { deleteRace, getRace } from "@/features/race/actions/race";
 import { RaceTimer } from "@/features/race/components/RaceTimer";
 import { summarizeResultsForPlayers } from "@/lib/pure";
+import { cn } from "@/lib/utils";
 import type { PlayerResult } from "@/types/types";
 
 export default async function ResultsPage({
@@ -24,35 +33,51 @@ export default async function ResultsPage({
   const raceResults = summarizeResultsForPlayers(playerStats);
 
   return (
-    <div className="flex flex-col gap-5 items-center">
-      <div>Results for Race #{raceId.slice(0, 7).toUpperCase()}</div>
-      <div className="flex gap-2">
-        Ends in
-        <RaceTimer
-          endTime={race.end_time}
-          serverNow={serverNow}
-          action={deleteRace.bind(null, raceId)}
-        />
+    <div className="flex flex-col gap-2">
+      <div>
+        <h2 className="text-muted-foreground">Results for Race </h2>
+        <h2 className="text-xl text-sidebar-foreground">
+          #{raceId.slice(0, 7).toUpperCase()}
+        </h2>
+        <div className="flex gap-2 text-muted-foreground">
+          Ends in
+          <RaceTimer
+            endTime={race.end_time}
+            serverNow={serverNow}
+            action={deleteRace.bind(null, raceId)}
+          />
+        </div>
       </div>
-      {raceResults.map((player, index) => (
-        <PlayerCard
-          key={player.userId}
-          player={{ ...player, position: index + 1 }}
-        />
-      ))}
-    </div>
-  );
-}
 
-function PlayerCard({ player }: { player: PlayerResult }) {
-  return (
-    <div className="flex gap-2">
-      <div>{player.position}.</div>
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold">{player.name}</h2>
-        <p>Average WPM: {player.averageWpm}</p>
-        <p>Average Accuracy: {player.averageAccuracy}%</p>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Position</TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead>Average WPM</TableHead>
+            <TableHead>Average Accuracy</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {raceResults.map((result: PlayerResult, index) => {
+            const isWinner = index === 0;
+            const position = index + 1;
+            return (
+              <TableRow
+                className={cn(isWinner && "text-chart-1 bg-t")}
+                key={result.userId}
+              >
+                <TableCell>{position}</TableCell>
+                <TableCell>{result.name}</TableCell>
+                <TableCell>{result.averageWpm.toFixed(2)}</TableCell>
+                <TableCell>
+                  {(result.averageAccuracy * 100).toFixed(2)}%
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }

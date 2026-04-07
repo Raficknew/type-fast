@@ -29,7 +29,7 @@ export function GameSentence({
   }
 
   return (
-    <div className="w-full text-xl rounded select-none leading-relaxed tracking-wide cursor-text grow">
+    <div className="w-full text-xl text-pretty rounded select-none leading-relaxed tracking-wide cursor-text grow">
       {tokens.map((token) => (
         <span
           key={token.startIndex}
@@ -55,9 +55,14 @@ export function GameSentence({
                       : "text-destructive"
                     : "text-muted-foreground",
                   isWrongSpace ? "bg-destructive rounded-sm" : "",
-                  isCursor ? "border-l-2" : "",
                 )}
               >
+                {isCursor && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute left-0 top-[0.05em] h-[1.2em] w-0.5 rounded bg-primary"
+                  />
+                )}
                 {isTyped && !isCorrect ? typedSoFar[idx] : char}
               </span>
             );
