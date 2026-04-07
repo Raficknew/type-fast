@@ -3,11 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getServerClockOffset, getTimeLeft } from "@/lib/pure";
 
 export function RaceTimer({
+  title,
   endTime,
   serverNow,
   action,
   onTick,
 }: {
+  title: string;
   endTime: string;
   serverNow: string;
   action: () => void;
@@ -53,5 +55,9 @@ export function RaceTimer({
     };
   }, [endTime, serverOffsetMs, action, onTick]);
 
-  return <h2>{counter}</h2>;
+  return (
+    <div className="flex gap-2 text-sm text-muted-foreground">
+      <p>{title}</p> <p>{counter}</p>
+    </div>
+  );
 }

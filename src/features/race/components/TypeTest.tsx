@@ -518,9 +518,10 @@ export function TypeTest({
 
   return (
     <main className="flex flex-col gap-2 p-4 max-w-150">
-      <section className="flex gap-2">
+      <section className="flex gap-2 w-full justify-between items-center">
         <h3 className="text-primary">round {game.round}</h3>
         <RaceTimer
+          title="Next round in"
           endTime={game.endTime}
           serverNow={serverNow}
           action={handleRoundEnd}

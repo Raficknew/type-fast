@@ -39,14 +39,12 @@ export default async function ResultsPage({
         <h2 className="text-xl text-sidebar-foreground">
           #{raceId.slice(0, 7).toUpperCase()}
         </h2>
-        <div className="flex gap-2 text-muted-foreground">
-          Ends in
-          <RaceTimer
-            endTime={race.end_time}
-            serverNow={serverNow}
-            action={deleteRace.bind(null, raceId)}
-          />
-        </div>
+        <RaceTimer
+          title="Ends in"
+          endTime={race.end_time}
+          serverNow={serverNow}
+          action={deleteRace.bind(null, raceId)}
+        />
       </div>
 
       <Table>
