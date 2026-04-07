@@ -26,12 +26,14 @@ export default async function ResultsPage({
   return (
     <div className="flex flex-col gap-5 items-center">
       <div>Results for Race #{raceId.slice(0, 7).toUpperCase()}</div>
-      <RaceTimer
-        title="Ends in"
-        endTime={race.end_time}
-        serverNow={serverNow}
-        action={deleteRace.bind(null, raceId)}
-      />
+      <div className="flex gap-2">
+        Ends in
+        <RaceTimer
+          endTime={race.end_time}
+          serverNow={serverNow}
+          action={deleteRace.bind(null, raceId)}
+        />
+      </div>
       {raceResults.map((player, index) => (
         <PlayerCard
           key={player.userId}

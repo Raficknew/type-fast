@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import type { GameState } from "@/types/types";
 
 export function GameSentence({
@@ -46,18 +47,16 @@ export function GameSentence({
             return (
               <span
                 key={idx}
-                className={[
+                className={cn(
                   "relative inline",
                   isTyped
                     ? isCorrect
-                      ? "text-green-400"
-                      : "text-red-400"
-                    : "text-gray-500",
-                  isWrongSpace ? "bg-red-400/50 rounded-sm" : "",
+                      ? "text-chart-1"
+                      : "text-destructive"
+                    : "text-muted-foreground",
+                  isWrongSpace ? "bg-destructive rounded-sm" : "",
                   isCursor ? "border-l-2" : "",
-                ]
-                  .join(" ")
-                  .trim()}
+                )}
               >
                 {isTyped && !isCorrect ? typedSoFar[idx] : char}
               </span>

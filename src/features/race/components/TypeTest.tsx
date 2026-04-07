@@ -3,6 +3,7 @@
 import type { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Progress } from "@/components/ui/progress";
 import {
   ensurePlayerRoundRow,
   updatePlayerLiveStats,
@@ -481,6 +482,25 @@ export function TypeTest({
         game.currentText
       : game.currentText;
 
+  const completedWordsTextLength =
+    game.currentWordIndex > 0
+      ? wordsInSentence.slice(0, game.currentWordIndex).join(" ").length + 1
+      : 0;
+  const currentWord = wordsInSentence[game.currentWordIndex] ?? "";
+  let currentWordCorrectChars = 0;
+
+  for (let i = 0; i < game.currentText.length; i++) {
+    if (game.currentText[i] !== currentWord[i]) {
+      break;
+    }
+    currentWordCorrectChars += 1;
+  }
+
+  const correctCharsCount = Math.min(
+    charCounter,
+    completedWordsTextLength + currentWordCorrectChars,
+  );
+
   const handleRoundEnd = useCallback(() => {
     const roundToAdvance = gameRef.current.round;
     setGame((prev) => ({ ...prev, counter: 0, hasRoundEnded: true }));
@@ -491,16 +511,23 @@ export function TypeTest({
     setGame((prev) => ({ ...prev, counter: timeLeft }));
   }, []);
 
+  const progress =
+    charCounter === 0
+      ? 0
+      : Math.min(1, Math.max(correctCharsCount / charCounter, 0));
+
   return (
-    <div className="flex flex-col gap-2 p-4 max-w-150">
-      <div>Round: {game.round}</div>
-      <RaceTimer
-        title="Next Round in"
-        endTime={game.endTime}
-        serverNow={serverNow}
-        action={handleRoundEnd}
-        onTick={handleTimerTick}
-      />
+    <main className="flex flex-col gap-2 p-4 max-w-150">
+      <section className="flex gap-2">
+        <h3 className="text-primary">round {game.round}</h3>
+        <RaceTimer
+          endTime={game.endTime}
+          serverNow={serverNow}
+          action={handleRoundEnd}
+          onTick={handleTimerTick}
+        />
+      </section>
+      <Progress value={progress * 100} className="w-full" />
       <GameSentence game={game} typedSoFar={typedSoFar} />
       <input
         ref={inputRef}
@@ -519,6 +546,6 @@ export function TypeTest({
         accuracy={accuracy}
         live_progress={wordsInSentence[game.currentWordIndex] ?? "FINISHED"}
       />
-    </div>
+    </main>
   );
 }
