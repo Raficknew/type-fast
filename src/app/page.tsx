@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { StartGameButton } from "@/components/StartGameButton";
 import { PlayerName } from "@/features/player/components/PlayerName";
-import { createRace, getRace } from "@/features/race/actions/race";
+import {
+  createRace,
+  deleteRaceIfStale,
+  getRace,
+} from "@/features/race/actions/race";
 import { TypeTest } from "@/features/race/components/TypeTest";
 import { MAX_ROUNDS } from "@/gameSettings";
 
@@ -20,6 +24,14 @@ export default async function TypeFastGamePage() {
 
   if (race.round >= MAX_ROUNDS - 1) {
     redirect(`/results/${race.id}`);
+  }
+
+  if (race.end_time) {
+    const raceDeleted = await deleteRaceIfStale(race.id);
+
+    if (raceDeleted) {
+      redirect("/");
+    }
   }
 
   return (

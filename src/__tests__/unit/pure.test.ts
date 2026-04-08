@@ -9,6 +9,7 @@ import {
   getServerClockOffset,
   getTimeLeft,
   getUserName,
+  isStaleRace,
   summarizeResultsForPlayers,
 } from "@/lib/pure";
 import { sentences } from "@/lib/sentences";
@@ -93,6 +94,26 @@ describe("getServerClockOffset", () => {
 
     const serverNow = new Date("2026-01-01T00:00:30.000Z").toISOString();
     expect(getServerClockOffset(serverNow)).toBe(30_000);
+  });
+});
+
+describe("isStaleRace", () => {
+  it("returns true when end time is older than 2 minutes", () => {
+    const now = new Date("2026-01-01T00:05:00.000Z");
+    const endTime = new Date("2026-01-01T00:02:59.999Z").toISOString();
+
+    expect(isStaleRace(endTime, now.getTime())).toBe(true);
+  });
+
+  it("returns false exactly at the 2-minute threshold", () => {
+    const now = new Date("2026-01-01T00:05:00.000Z");
+    const endTime = new Date("2026-01-01T00:03:00.000Z").toISOString();
+
+    expect(isStaleRace(endTime, now.getTime())).toBe(false);
+  });
+
+  it("returns false for an invalid end time", () => {
+    expect(isStaleRace("not-a-date", Date.now())).toBe(false);
   });
 });
 
