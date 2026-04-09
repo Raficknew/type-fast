@@ -19,8 +19,27 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TypeFast",
-  description: "A real-time multiplayer typing speed game",
+  title: {
+    default: "TypeFast",
+    template: "%s | TypeFast",
+  },
+  description:
+    "A real-time multiplayer typing speed game built with Next.js and Supabase.",
+  applicationName: "TypeFast",
+  keywords: [
+    "typing game",
+    "multiplayer game",
+    "Supabase",
+    "Next.js",
+    "real-time",
+  ],
+  authors: [{ name: "TypeFast" }],
+  creator: "TypeFast",
+  publisher: "TypeFast",
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
