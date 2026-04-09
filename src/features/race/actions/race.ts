@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { MAX_ROUNDS } from "@/gameSettings";
 import { supabaseServer as supabase } from "@/lib/db";
 import { assertNoSupabaseError } from "@/lib/permissions";
-import { getRandomSentence, getRoundEndTime } from "@/lib/pure";
+import { getRandomSentence, getRoundEndTime, isStaleRace } from "@/lib/pure";
 import { assertRaceEnded } from "../permissions/race";
 
 export const createRace = async () => {
@@ -50,6 +50,28 @@ export const deleteRace = async (raceId: string) => {
   assertNoSupabaseError(error);
 
   revalidatePath("/");
+};
+
+export const deleteRaceIfStale = async (raceId: string) => {
+  const { data: race, error: fetchError } = await supabase
+    .from("race")
+    .select("end_time")
+    .eq("id", raceId)
+    .single();
+
+  if (fetchError || !race || !isStaleRace(race.end_time)) {
+    return false;
+  }
+
+  const { error } = await supabase
+    .from("race")
+    .delete()
+    .eq("id", raceId)
+    .eq("end_time", race.end_time);
+
+  assertNoSupabaseError(error);
+
+  return true;
 };
 
 export const restartRace = async (raceId: string, currentRound: number) => {

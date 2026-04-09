@@ -11,6 +11,22 @@ export const getTimeLeft = (endTime: string, nowMs = Date.now()) => {
   return Math.floor((new Date(endTime).getTime() - nowMs) / 1000);
 };
 
+export const STALE_RACE_THRESHOLD_MS = 2 * 60 * 1000;
+
+export const isStaleRace = (
+  endTime: string,
+  nowMs = Date.now(),
+  thresholdMs = STALE_RACE_THRESHOLD_MS,
+) => {
+  const endTimeMs = new Date(endTime).getTime();
+
+  if (Number.isNaN(endTimeMs)) {
+    return false;
+  }
+
+  return nowMs - endTimeMs > thresholdMs;
+};
+
 export const getServerClockOffset = (
   serverNow: string,
   clientNowMs = Date.now(),
