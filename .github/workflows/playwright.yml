@@ -4,19 +4,34 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  deployment_status:
 jobs:
   test:
+    if: ${{ github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production') }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BASE_URL: ${{ github.event_name == 'deployment_status' && (github.event.deployment_status.environment_url || github.event.deployment_status.target_url) || '' }}
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
-        node-version: lts/*
+        node-version: "22"
+        cache: pnpm
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10
     - name: Install dependencies
-      run: npm install -g pnpm && pnpm install
+      run: pnpm install --frozen-lockfile
     - name: Install Playwright Browsers
       run: pnpm exec playwright install --with-deps
+    - name: Validate Vercel deployment URL
+      if: ${{ github.event_name == 'deployment_status' }}
+      run: |
+        if [ -z "$PLAYWRIGHT_BASE_URL" ]; then
+          echo "Missing deployment URL from Vercel deployment_status payload"
+          exit 1
+        fi
     - name: Run Playwright tests
       run: pnpm exec playwright test
     - uses: actions/upload-artifact@v4
