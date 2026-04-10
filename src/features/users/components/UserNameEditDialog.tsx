@@ -38,7 +38,7 @@ export function UserNameEditDialog({ name }: { name?: string }) {
     <Dialog open={isOpened} onOpenChange={setIsOpened}>
       <DialogTrigger
         render={
-          <button type="button">
+          <button type="button" data-testid="edit-nickname-button">
             <HugeiconsIcon
               className="absolute right-0 top-0 cursor-pointer"
               size={10}

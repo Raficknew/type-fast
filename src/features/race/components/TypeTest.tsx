@@ -532,6 +532,7 @@ export function TypeTest({
       <GameSentence game={game} typedSoFar={typedSoFar} />
       <input
         ref={inputRef}
+        data-testid="typing-input"
         type="text"
         className="opacity-0 absolute left-0 top-0 w-full h-full"
         value={game.currentText}
