@@ -21,18 +21,25 @@ test("homepage can start and play the game loop", async ({ page }) => {
 
   await homePage.waitForGameLoop();
   await expect(homePage.sentence).toBeVisible();
+  const initialRound =
+    (await homePage.roundIndicator.textContent())?.trim() ?? "";
 
   const sentence = (await homePage.getSentence()).trim();
   expect(sentence.length).toBeGreaterThan(0);
 
-  const words = sentence.split(/\s+/);
-
   await homePage.focusTypingInput();
-  for (let index = 0; index < words.length; index += 1) {
-    const separator = index === words.length - 1 ? "" : " ";
-    await page.keyboard.type(`${words[index]}${separator}`);
-  }
+  await homePage.typingInput.pressSequentially(sentence);
 
-  await expect(homePage.typingInput).toBeDisabled();
+  await expect
+    .poll(async () => {
+      if (await homePage.typingInput.isDisabled()) {
+        return true;
+      }
+
+      const currentRound =
+        (await homePage.roundIndicator.textContent())?.trim() ?? "";
+      return currentRound !== initialRound;
+    })
+    .toBeTruthy();
   await expect(homePage.roundIndicator).toBeVisible();
 });
