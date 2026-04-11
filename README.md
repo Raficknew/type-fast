@@ -47,6 +47,7 @@ cp .env.template .env
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project → Settings → API |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` | Supabase project → Settings → API |
+| `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` | Supabase project → Settings → API (service_role, keep secret) |
 
 3. Set up the database
 

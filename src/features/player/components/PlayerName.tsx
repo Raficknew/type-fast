@@ -115,7 +115,10 @@ export function PlayerName({
     <div className="flex relative items-center gap-2">
       <p>
         Playing as{" "}
-        <span className="font-semibold text-sidebar-primary">
+        <span
+          data-testid="player-display-name"
+          className="font-semibold text-sidebar-primary"
+        >
           {displayName}
         </span>
       </p>
