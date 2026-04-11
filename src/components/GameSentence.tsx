@@ -31,6 +31,7 @@ export function GameSentence({
   return (
     <div
       data-testid="game-sentence"
+      data-raw-sentence={game.sentence}
       className="w-full text-xl text-pretty rounded select-none leading-relaxed tracking-wide cursor-text grow"
     >
       {tokens.map((token) => (

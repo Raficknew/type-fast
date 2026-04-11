@@ -4,6 +4,7 @@ export class HomePageModel {
   readonly page: Page;
   readonly startButton;
   readonly roundIndicator;
+  readonly progressBar;
   readonly sentence;
   readonly typingInput;
   readonly editNicknameButton;
@@ -15,6 +16,7 @@ export class HomePageModel {
     this.page = page;
     this.startButton = this.page.getByRole("button", { name: "Start Game" });
     this.roundIndicator = this.page.getByText(/^round \d+/i);
+    this.progressBar = this.page.getByRole("progressbar");
     this.sentence = this.page.getByTestId("game-sentence");
     this.typingInput = this.page.getByTestId("typing-input");
     this.editNicknameButton = this.page.getByTestId("edit-nickname-button");
@@ -59,10 +61,20 @@ export class HomePageModel {
   }
 
   async getSentence() {
+    const rawSentence = await this.sentence.getAttribute("data-raw-sentence");
+    if (rawSentence) {
+      return rawSentence;
+    }
+
     return (await this.sentence.textContent()) ?? "";
   }
 
   async focusTypingInput() {
     await this.typingInput.focus();
+  }
+
+  async getProgressValue() {
+    const raw = await this.progressBar.getAttribute("aria-valuenow");
+    return Number(raw ?? "0");
   }
 }
