@@ -68,9 +68,7 @@ export default async function ResultsPage({
                 <TableCell>{position}</TableCell>
                 <TableCell>{result.name}</TableCell>
                 <TableCell>{result.averageWpm.toFixed(2)}</TableCell>
-                <TableCell>
-                  {(result.averageAccuracy * 100).toFixed(2)}%
-                </TableCell>
+                <TableCell>{result.averageAccuracy.toFixed(2)}%</TableCell>
               </TableRow>
             );
           })}
