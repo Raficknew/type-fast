@@ -9,6 +9,8 @@ import {
 import { TypeTest } from "@/features/race/components/TypeTest";
 import { MAX_ROUNDS } from "@/gameSettings";
 
+export const dynamic = "force-dynamic";
+
 export default async function TypeFastGamePage() {
   const race = await getRace().catch(() => null);
   const serverNow = new Date().toISOString();
