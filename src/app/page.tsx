@@ -22,7 +22,7 @@ export default async function TypeFastGamePage() {
     );
   }
 
-  if (race.round >= MAX_ROUNDS - 1) {
+  if (race.round >= MAX_ROUNDS) {
     redirect(`/results/${race.id}`);
   }
 
