@@ -3,7 +3,7 @@ name: CODE CHECK
 on: [pull_request]
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
   issues: write
 
@@ -20,12 +20,6 @@ jobs:
       
       - name: Run Biome
         run: biome ci .
-
-      - name: notify vercel
-        if: ${{ always() }}
-        uses: vercel/repository-dispatch/actions/status@v1
-        with:
-          name: "Vercel - type-fast: lint"
 
   test:
     runs-on: ubuntu-latest
