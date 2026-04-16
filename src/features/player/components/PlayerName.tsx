@@ -19,6 +19,7 @@ export function PlayerName({
   const [user, setUser] = useState<User | null>(null);
   const [raceScopedName, setRaceScopedName] = useState<string | null>(null);
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isDialogOpened, setIsDialogOpened] = useState(false);
 
   const fetchRaceScopedName = useCallback(async () => {
     if (!hasGameStarted || !raceId || round === undefined || !user) {
@@ -111,20 +112,45 @@ export function PlayerName({
   const displayName = hasGameStarted ? (raceScopedName ?? name) : name;
   const isGenerated = displayName.startsWith("Player #");
 
+  const handleNameUpdated = async (updatedName: string) => {
+    setUser((prev) => {
+      if (!prev) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        user_metadata: {
+          ...prev.user_metadata,
+          name: updatedName,
+        },
+      };
+    });
+
+    if (hasGameStarted) {
+      await fetchRaceScopedName();
+    }
+  };
+
   return (
-    <div className="flex relative items-center gap-2">
+    <div className="relative z-20 flex items-center gap-2">
       <p>
         Playing as{" "}
-        <span
+        <button
+          type="button"
           data-testid="player-display-name"
-          className="font-semibold text-sidebar-primary"
+          className="font-semibold text-sidebar-primary cursor-pointer"
+          onClick={() => setIsDialogOpened(true)}
         >
           {displayName}
-        </span>
+        </button>
       </p>
-      {!hasGameStarted && (
-        <UserNameEditDialog name={isGenerated ? undefined : displayName} />
-      )}
+      <UserNameEditDialog
+        name={isGenerated ? undefined : displayName}
+        isOpened={isDialogOpened}
+        setIsOpened={setIsDialogOpened}
+        onNameUpdated={handleNameUpdated}
+      />
     </div>
   );
 }
