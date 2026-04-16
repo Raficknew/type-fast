@@ -63,8 +63,8 @@ describe("ResultsPage integration", () => {
     const raceId = "d9b1c8e7-5a1b-4c3e-9f0a-2b6c8e7f9a1b";
 
     getFinalPlayersStatsMock.mockResolvedValue([
-      { id: "1", user_id: "u-1", name: "Alice", wpm: 80, accuracy: 0.98 },
-      { id: "2", user_id: "u-2", name: "Bob", wpm: 72, accuracy: 0.95 },
+      { id: "1", user_id: "u-1", name: "Alice", wpm: 80, accuracy: 98 },
+      { id: "2", user_id: "u-2", name: "Bob", wpm: 72, accuracy: 95 },
     ]);
     getRaceMock.mockResolvedValue({
       id: raceId,
@@ -75,13 +75,13 @@ describe("ResultsPage integration", () => {
         userId: "u-1",
         name: "Alice",
         averageWpm: 80,
-        averageAccuracy: 0.98,
+        averageAccuracy: 98,
       },
       {
         userId: "u-2",
         name: "Bob",
         averageWpm: 72,
-        averageAccuracy: 0.95,
+        averageAccuracy: 95,
       },
     ]);
 

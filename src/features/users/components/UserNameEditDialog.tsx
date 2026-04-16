@@ -2,7 +2,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Edit03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,12 +15,21 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { updateCurrentRacePlayerName } from "@/features/player/actions/playerStats";
 import { supabaseClient as supabase } from "@/lib/db";
 import { type PlayerSchema, playerSchema } from "../../player/schema/schema";
 
-export function UserNameEditDialog({ name }: { name?: string }) {
-  const [isOpened, setIsOpened] = useState<boolean>(false);
-
+export function UserNameEditDialog({
+  name,
+  isOpened,
+  setIsOpened,
+  onNameUpdated,
+}: {
+  name?: string;
+  isOpened: boolean;
+  setIsOpened: (open: boolean) => void;
+  onNameUpdated?: (name: string) => void;
+}) {
   const form = useForm<PlayerSchema>({
     resolver: zodResolver(playerSchema),
     defaultValues: { name: name ?? "" },
@@ -31,6 +39,20 @@ export function UserNameEditDialog({ name }: { name?: string }) {
     await supabase.auth.updateUser({
       data: { name: data.name },
     });
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.user.id && session.access_token) {
+      await updateCurrentRacePlayerName(
+        session.user.id,
+        session.access_token,
+        data.name,
+      );
+    }
+
+    onNameUpdated?.(data.name);
     setIsOpened(false);
   }
 
@@ -40,7 +62,7 @@ export function UserNameEditDialog({ name }: { name?: string }) {
         render={
           <button type="button" data-testid="edit-nickname-button">
             <HugeiconsIcon
-              className="absolute right-0 top-0 cursor-pointer"
+              className="absolute -right-0.5 top-0 cursor-pointer"
               size={10}
               icon={Edit03Icon}
             />

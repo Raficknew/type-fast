@@ -137,3 +137,31 @@ export const getFinalPlayersStats = async (
 
   return data ?? [];
 };
+
+export const updateCurrentRacePlayerName = async (
+  userId: string,
+  accessToken: string,
+  displayName: string,
+): Promise<void> => {
+  await assertAuthenticatedUser(userId, accessToken);
+
+  const { data: activeRace, error: raceError } = await supabase
+    .from("race")
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  assertNoSupabaseError(raceError);
+
+  if (!activeRace) {
+    return;
+  }
+
+  const { error: updateError } = await supabase
+    .from("player_stats")
+    .update({ name: displayName })
+    .eq("race_id", activeRace.id)
+    .eq("user_id", userId);
+
+  assertNoSupabaseError(updateError);
+};

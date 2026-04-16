@@ -4,6 +4,12 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
 jobs:
   test:
     timeout-minutes: 60
@@ -23,6 +29,10 @@ jobs:
       run: pnpm exec playwright install --with-deps
     - name: Run Playwright tests
       run: pnpm exec playwright test
+    - name: notify vercel
+      uses: vercel/repository-dispatch/actions/status@v1
+      with:
+        name: "Vercel - type-fast: playwright"
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:

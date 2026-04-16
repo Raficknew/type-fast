@@ -23,7 +23,7 @@ export default function ThemeSwitcher() {
 
   return (
     <Button
-      className="fixed left-10 top-10"
+      className="fixed left-10 top-10 z-20"
       onClick={() => setTheme(changeTheme)}
       variant="outline"
       size="icon"
