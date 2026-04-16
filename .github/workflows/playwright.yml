@@ -25,7 +25,6 @@ jobs:
     - name: Run Playwright tests
       run: pnpm exec playwright test
     - name: notify vercel
-      if: ${{ always() }}
       uses: vercel/repository-dispatch/actions/status@v1
       with:
         name: "Vercel - type-fast: playwright"
